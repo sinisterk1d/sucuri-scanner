@@ -26,7 +26,7 @@ export async function addWafDismissCookie(
   value = "1",
 ): Promise<void> {
   await context.addCookies([
-    { name: WAF_DISMISS_COOKIE, value, url: BASE_URL, path: "/" },
+    { name: WAF_DISMISS_COOKIE, value, url: BASE_URL },
   ]);
 }
 
