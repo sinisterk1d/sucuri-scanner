@@ -106,11 +106,13 @@ export function wpEval(php: string): string {
   return wpEnvRun(`wp eval '${escaped}'`);
 }
 
-/** Read the full contents of wp-config.php (checks ABSPATH and its parent). */
+/** Read the full contents of wp-config.php. */
 export function readWpConfig(): string {
-  return wpEnvRun(
-    `php -r '$p=ABSPATH."wp-config.php";if(!file_exists($p))$p=ABSPATH."../wp-config.php";echo file_get_contents($p);'`,
-  );
+  // `wp config path` resolves wp-config.php whether it lives at the docroot or one
+  // directory above, then `cat` returns it verbatim. A bare `php -r` cannot be used
+  // here: ABSPATH is only defined inside a WordPress bootstrap, so standalone PHP
+  // either fatals or silently yields "" — which is why this used to read empty.
+  return wpEnvRun(`sh -c 'cat "$(wp config path)"'`);
 }
 
 /**
@@ -118,14 +120,19 @@ export function readWpConfig(): string {
  * Returns {} when the file is missing or unparseable.
  */
 export function readSettingsFileJson(): Record<string, unknown> {
+  // The PHP is single-quoted so the OUTER /bin/sh never expands the $-variables.
+  // (Double-quoting via JSON.stringify let the shell eat $path/$content before PHP
+  // ever ran, leaving a mangled `php -r ="...";=@file_get_contents();` syntax error.)
+  // SETTINGS_FILE_PATH has no shell-special chars, so it embeds safely in the
+  // double-quoted PHP literal, and the "\n" reaches PHP intact inside the single quotes.
   const php =
-    `$path=${JSON.stringify(SETTINGS_FILE_PATH)};` +
-    "$content=@file_get_contents($path);" +
-    'if($content===false){echo "";exit(0);} ' +
-    '$lines=explode("\\n",$content,2);' +
-    'if(count($lines)<2){echo "";exit(0);} ' +
-    "echo trim($lines[1]);";
-  const output = wpEnvRun(`php -r ${JSON.stringify(php)}`);
+    `$p="${SETTINGS_FILE_PATH}";` +
+    "$c=@file_get_contents($p);" +
+    'if($c===false){echo "";exit(0);}' +
+    '$l=explode("\\n",$c,2);' +
+    'if(count($l)<2){echo "";exit(0);}' +
+    "echo trim($l[1]);";
+  const output = wpEnvRun(`php -r '${php}'`);
   if (!output) return {};
   try {
     return JSON.parse(output) as Record<string, unknown>;

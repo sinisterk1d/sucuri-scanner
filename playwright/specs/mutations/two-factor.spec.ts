@@ -28,6 +28,7 @@ import { test, expect, type Browser, type Page } from "@playwright/test";
 import {
   TwoFactorAdminPage,
   loginExpect2FA,
+  submitLoginResilient,
   extractSecret,
   finishWithCode,
   completeSetupWithGeneratedCode,
@@ -63,12 +64,13 @@ async function withFreshUser(
   }
 }
 
-/** Submit the wp-login form for a user on a fresh page (no challenge assertion). */
+/**
+ * Submit the wp-login form for a user on a fresh page (no challenge assertion).
+ * Uses the shared resilient submit so a transient login bounce back to a bare
+ * wp-login.php is retried; callers still assert the expected landing themselves.
+ */
 async function submitLoginRaw(page: Page, user: WpUser): Promise<void> {
-  await page.goto("/wp-login.php");
-  await page.locator("#user_login").fill(user.login);
-  await page.locator("#user_pass").fill(user.pass);
-  await page.locator("#wp-submit").click();
+  await submitLoginResilient(page, user);
 }
 
 test.describe("Two-Factor Authentication", () => {
@@ -196,9 +198,12 @@ test.describe("Two-Factor Authentication", () => {
         p.getByTestId("sucuriscan-2fa-reset-btn").click(),
       ]);
 
-      // The swapped-in snippet shows the new secret <code> and the QR container.
+      // The reset swaps in the profile setup snippet (profile-2fa-setup.snippet.tpl),
+      // whose secret is a PLAIN <code> with no class (the sucuriscan-2fa-secret-code
+      // class is dashboard-only). Scope to that snippet's code — mirrors the Cypress
+      // `cy.get('code').first()` check while staying within the freshly-rendered view.
       await expect(
-        p.locator("code.sucuriscan-2fa-secret-code").first(),
+        p.locator(".sucuriscan-profile-2fa-setup code").first(),
       ).toBeVisible();
       await expect(p.locator("#sucuriscan-topt-qr")).toBeVisible();
     });

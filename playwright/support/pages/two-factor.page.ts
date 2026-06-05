@@ -44,19 +44,30 @@ export class TwoFactorAdminPage {
     return this.page.getByTestId("sucuriscan_twofactor_bulk_submit_btn");
   }
 
-  /** Select a bulk mode and apply it (submits the form). */
+  /** Select a bulk mode and apply it (submits the form, a full-page POST + reload). */
   async applyBulk(mode: BulkMode): Promise<void> {
     await this.bulkSelect.selectOption(mode);
     await this.bulkSubmit.click();
+  }
+
+  /** Wait for the post-submit "Two-Factor" notice — proves the bulk reload has landed. */
+  private async expectBulkNotice(): Promise<void> {
+    await expect(
+      this.page.locator(".sucuriscan-alert, .updated, .notice", {
+        hasText: "Two-Factor",
+      }),
+    ).toBeVisible();
   }
 
   /** Tick the selection checkbox for each user (by resolved user ID). */
   async selectUsers(users: WpUser[]): Promise<void> {
     for (const user of users) {
       const id = getUserId(user.login);
-      await this.page
-        .getByTestId(`twofactor-user-checkbox-${id}`)
-        .check({ force: true });
+      // Plain check() (not force): it waits for the box to be stable/actionable
+      // and is a no-op if already checked. force:true skips both, which surfaced as
+      // "clicking the checkbox did not change its state" when a click landed during
+      // the post-bulk reload.
+      await this.page.getByTestId(`twofactor-user-checkbox-${id}`).check();
     }
   }
 
@@ -64,11 +75,7 @@ export class TwoFactorAdminPage {
   async setModeAllUsers(mode: BulkMode = "activate_all"): Promise<void> {
     await this.goto();
     await this.applyBulk(mode);
-    await expect(
-      this.page.locator(".sucuriscan-alert, .updated, .notice", {
-        hasText: "Two-Factor",
-      }),
-    ).toBeVisible();
+    await this.expectBulkNotice();
   }
 
   /** Clear the slate, then enforce a "selected users" mode for the given users. */
@@ -78,10 +85,12 @@ export class TwoFactorAdminPage {
   ): Promise<void> {
     await this.goto();
     // Clear any prior selection state the way the Cypress helper did.
-    await this.page
-      .getByTestId("twofactor-user-checkbox-1")
-      .check({ force: true });
+    await this.page.getByTestId("twofactor-user-checkbox-1").check();
     await this.applyBulk("deactivate_all");
+    // Wait for the deactivate reload to land before selecting users: otherwise the
+    // checks below run on the pre-reload page and are discarded, so the second
+    // submit enforces an empty selection (the user then logs in with no challenge).
+    await this.expectBulkNotice();
 
     await this.selectUsers(users);
     await this.applyBulk(mode);
@@ -116,13 +125,54 @@ export async function expectChallenge(
 ): Promise<void> {
   if (kind === "setup") {
     await expect(page).toHaveURL(/action=sucuri-2fa-setup/);
+    // login_header() renders the title as <h1 class="screen-reader-text"> AND an
+    // intro <p class="message"> whose text "Set up two-factor authentication…" also
+    // contains the title, so a plain getByText matches both (strict-mode violation).
+    // Target the heading role to uniquely select the screen-reader title.
     await expect(
-      page.getByText("Set up Two-Factor Authentication"),
+      page.getByRole("heading", { name: "Set up Two-Factor Authentication" }),
     ).toBeVisible();
   } else {
     // `action=sucuri-2fa` (NOT `-setup`) is the verify screen.
     await expect(page).toHaveURL(/action=sucuri-2fa(?!-setup)/);
     await expect(page).not.toHaveURL(/action=sucuri-2fa-setup/);
+  }
+}
+
+/**
+ * Submit the wp-login form for `user` and leave the page on its settled landing:
+ * a 2FA challenge (action=sucuri-2fa[-setup]) or wp-admin.
+ *
+ * Reaching either depends on a server redirect — for enforced users one that mints
+ * a one-time login token. Very occasionally the first POST bounces straight back to
+ * a bare wp-login.php (no `action=`, no error) instead, a transient login/token
+ * race that clears on a re-submit, so retry a few times. The two TERMINAL outcomes
+ * are never retried: a real credential error (#login_error) or a settled landing —
+ * callers assert the specific expected screen afterward, so a genuine wrong landing
+ * still surfaces there rather than being masked.
+ */
+export async function submitLoginResilient(
+  page: Page,
+  user: WpUser,
+): Promise<void> {
+  const maxAttempts = 3;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    await page.goto("/wp-login.php");
+    await page.locator("#user_login").fill(user.login);
+    await page.locator("#user_pass").fill(user.pass);
+    await page.locator("#wp-submit").click();
+
+    // waitForURL (not waitForNavigation, which can miss a fast redirect and hang)
+    // settles on the challenge or wp-admin.
+    try {
+      await page.waitForURL(/action=sucuri-2fa|\/wp-admin\//, {
+        timeout: 10_000,
+      });
+      return; // settled on a challenge or wp-admin
+    } catch {
+      if ((await page.locator("#login_error").count()) > 0) return; // real auth error
+      // else: bounced to a bare wp-login.php — retry unless this was the last try.
+    }
   }
 }
 
@@ -132,10 +182,7 @@ export async function loginExpect2FA(
   user: WpUser,
   kind: ChallengeKind,
 ): Promise<void> {
-  await page.goto("/wp-login.php");
-  await page.locator("#user_login").fill(user.login);
-  await page.locator("#user_pass").fill(user.pass);
-  await page.locator("#wp-submit").click();
+  await submitLoginResilient(page, user);
   await expectChallenge(page, kind);
 }
 

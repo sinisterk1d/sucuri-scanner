@@ -55,9 +55,14 @@ test.describe("Dashboard theme gating", () => {
 
     await expect(page.locator("#core-vulnerability-results")).not.toBeVisible();
     await expect(page.locator("#php-vulnerability-results")).not.toBeVisible();
-    await expect(
-      page.locator(".sucuriscan-themes-list-body"),
-    ).not.toBeVisible();
+    // Both list bodies (Plugins + Themes) sit inside the PremiumVisibility wrapper,
+    // which is display:none in freemium — present in the DOM but hidden. Mirror the
+    // Cypress `should('not.be.visible')` over the matched set: strict mode forbids
+    // not.toBeVisible() on a multi-element locator, so assert the count and check each.
+    const themeBodies = page.locator(".sucuriscan-themes-list-body");
+    await expect(themeBodies).toHaveCount(2);
+    await expect(themeBodies.first()).not.toBeVisible();
+    await expect(themeBodies.last()).not.toBeVisible();
   });
 
   test("Test Dark Theme", async ({ page }) => {
@@ -69,19 +74,28 @@ test.describe("Dashboard theme gating", () => {
     if (
       ((await form.getAttribute("class")) ?? "").includes("sucuriscan-hidden")
     ) {
+      // The "Update" entry is an <option> inside a hover-revealed custom dropdown
+      // (firewall-settings.html.tpl:114-118) with a jQuery click handler bound to
+      // it. Playwright can't .click() a hidden <option>; dispatchEvent fires the
+      // handler directly — the faithful equivalent of Cypress's synthetic click.
       await page
         .locator('#sucuriscan-waf-key-options option[value="update"]')
-        .click();
+        .dispatchEvent("click");
     }
 
     await page
       .locator('input[name="sucuriscan_cloudproxy_apikey"]')
       .fill(FAKE_API_KEY);
     await page.getByTestId("sucuriscan-save-wafkey").click();
-    // Confirm the key was actually saved before navigating away.
-    await expect(page.locator(".sucuriscan-alert-updated")).toContainText(
-      "Firewall API key was successfully saved",
-    );
+    // Confirm the key was actually saved before navigating away. Saving a key also
+    // flips the reverse-proxy + addr-header settings, so THREE success alerts render;
+    // filter to the key one (Cypress's .contains() picked the matching node, Playwright
+    // strict mode forbids toContainText over a multi-element locator).
+    await expect(
+      page
+        .locator(".sucuriscan-alert-updated")
+        .filter({ hasText: "Firewall API key was successfully saved" }),
+    ).toBeVisible();
 
     // Stub the vulnerability-scan AJAX to fail immediately, avoiding a ~60s wait
     // for two sequential 30s external-API timeouts. Register BEFORE visiting the

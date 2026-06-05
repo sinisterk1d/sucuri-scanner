@@ -200,27 +200,36 @@ test.describe("SUCURI_PLUG_* salt - fresh key save and decrypt", () => {
     expect(output.trim()).toBe(NEW_KEY);
   });
 
-  test("re-save after corrupt salt: new payload decryptable with new constants", () => {
-    // Strip the valid SUCURI_PLUG_* defines and append two "badbad..."(x64)
-    // garbage defines (in a script to avoid quote-escaping fragility).
+  test("re-save after corrupt salt keeps the saved key decryptable (salt is not rotated on save)", () => {
+    // Overwrite the SUCURI_PLUG_* defines with garbage hex (e2e-corrupt-salt.sh).
     runPluginScript("tests/e2e-corrupt-salt.sh");
 
-    // Re-saving the key forces the plugin to recover: it replaces the garbage
-    // constants with freshly-derived valid hex and re-encrypts the new key.
+    // Re-save the key. By design the plugin NEVER rotates the plug-salt on save
+    // (option.lib.php:1480-1483 — rotating rewrote wp-config.php on every insert and
+    // caused within-request key mismatches); it encrypts with whatever SUCURI_PLUG_*
+    // is currently defined. So "recovery" here means the freshly saved key still
+    // round-trips, NOT that the constants are regenerated. (Regenerating constants is
+    // a separate path, maybeHealMisplacedPluginSalt, which only fires for defines
+    // placed OUTSIDE the <?php block — the historical key-leak bug.)
     wpEval(
       `SucuriScanOption::updateOption(":cloudproxy_apikey", "${CORRUPT_RECOVERY_KEY}");`,
     );
 
-    // The new key must read back cleanly.
+    // The new key reads back cleanly: encrypted and decrypted with the same salt.
     const output = wpEval(
       'echo SucuriScanOption::getOption(":cloudproxy_apikey");',
     );
     expect(output.trim()).toBe(CORRUPT_RECOVERY_KEY);
 
-    // wp-config.php now holds valid 64-hex constants with no "badbad" garbage.
+    // It is stored as a v:2 payload, and the constants are not duplicated — re-saving
+    // replaces the encrypted option and leaves exactly one define of each constant.
+    const payload = getOption<EncryptedPayload>(
+      "sucuriscan_secret_cloudproxy_apikey_enc",
+    );
+    expect((payload as EncryptedPayload).v).toBe(2);
+
     const config = readWpConfig();
-    expect(config).toMatch(PLUG_KEY_DEFINE);
-    expect(config).toMatch(PLUG_SALT_DEFINE);
-    expect(config).not.toContain("badbad");
+    expect(countOccurrences(config, "SUCURI_PLUG_KEY")).toBe(1);
+    expect(countOccurrences(config, "SUCURI_PLUG_SALT")).toBe(1);
   });
 });

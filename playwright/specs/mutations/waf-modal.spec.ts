@@ -45,8 +45,9 @@ test.describe("WAF activation modal", () => {
       {
         name: "sucuriscan_waf_dismissed",
         value: "0",
+        // Provide `url` alone: Playwright derives the host + "/" path from it and
+        // rejects a url+path pair ("Cookie should have either url or path").
         url: BASE_URL,
-        path: "/",
       },
     ]);
 
