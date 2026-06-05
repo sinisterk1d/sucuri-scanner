@@ -11,9 +11,22 @@
  *   3. In another fresh logged-out context, confirm the old password no longer
  *      works (WP core #login_error).
  *
+ * Logged-out contexts: steps 1 and 3 MUST run logged out, so they pass an empty
+ * `storageState` to browser.newContext(). Under @playwright/test the `browser`
+ * fixture's newContext() otherwise inherits the project `use` options — including
+ * the admin storageState — so a bare newContext() carries the admin
+ * `wordpress_logged_in` cookie (see support/fixtures.ts, which documents the same
+ * footgun for loggedOutRequest). WordPress then no-ops the login form on correct
+ * creds (no redirect to wp-admin) and masks the failed-login #login_error,
+ * breaking both assertions. This is the Playwright analog of the Cypress
+ * original's Cypress.session.clearAllSavedSessions()/clearCurrentSessionData().
+ *
  * Idempotency: the reset randomizes sucuri-reset's password, so step 1 would
- * fail on re-run. afterAll restores it to 'password' via wp-cli. The admin
- * account is never touched here (its row checkbox is rendered disabled).
+ * fail on re-run. The precondition is (re)seeded in beforeEach — NOT beforeAll,
+ * which would not re-run on a Playwright retry and would leave every retry
+ * starting from the already-randomized password. afterAll restores it to
+ * 'password' for later specs. The admin account is never touched here (its row
+ * checkbox is rendered disabled).
  */
 import { test, expect } from "@playwright/test";
 import { addWafDismissCookie, login } from "../../support/auth";
@@ -23,9 +36,11 @@ import { resetUser } from "../../support/env";
 const POST_HACK_URL = "/wp-admin/admin.php?page=sucuriscan_post_hack_actions";
 
 test.describe("Post-hack · Reset user password", () => {
-  test.beforeAll(() => {
+  test.beforeEach(() => {
     // Pin the precondition: sucuri-reset must start with the known old password
-    // so the initial "can log in" step is deterministic across re-runs.
+    // so the initial "can log in" step is deterministic. beforeEach (not
+    // beforeAll) so a retry re-seeds it — the test body randomizes the password,
+    // and beforeAll would not re-run, dooming every retry at step 1.
     wp(`user update ${resetUser.login} --user_pass=${resetUser.pass}`);
   });
 
@@ -40,7 +55,10 @@ test.describe("Post-hack · Reset user password", () => {
     browser,
   }) => {
     // 1. sucuri-reset can log in with the old password (fresh logged-out context).
-    const beforeContext = await browser.newContext();
+    // Empty storageState drops the inherited admin session — see file header.
+    const beforeContext = await browser.newContext({
+      storageState: { cookies: [], origins: [] },
+    });
     await addWafDismissCookie(beforeContext);
     const beforePage = await beforeContext.newPage();
     await login(beforePage, resetUser);
@@ -71,7 +89,10 @@ test.describe("Post-hack · Reset user password", () => {
     ).toContainText("sucuri-reset (Done)");
 
     // 3. The old password no longer works (fresh logged-out context).
-    const afterContext = await browser.newContext();
+    // Empty storageState drops the inherited admin session — see file header.
+    const afterContext = await browser.newContext({
+      storageState: { cookies: [], origins: [] },
+    });
     const afterPage = await afterContext.newPage();
     await afterPage.goto("/wp-login.php");
     await afterPage.locator("#user_login").fill(resetUser.login);
