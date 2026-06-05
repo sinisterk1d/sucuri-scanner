@@ -25,7 +25,7 @@
  */
 import { test, expect } from "../../support/fixtures";
 import type { Page } from "@playwright/test";
-import { updateOption } from "../../support/wp-cli";
+import { deleteOption, updateOption } from "../../support/wp-cli";
 import {
   expectHeaderEquals,
   expectHeaderContains,
@@ -39,35 +39,36 @@ const CSP_HEADER = "content-security-policy-report-only";
 // (Report Only) persisted by the earlier save test, so keep declaration order.
 test.describe.configure({ mode: "serial" });
 
-/** Submit the CSP form and await the form POST round-trip before reading headers. */
+/** Submit the CSP form and wait for the new page to fully render. */
 async function submitCspForm(page: Page): Promise<void> {
-  // Wait for the form POST round-trip (not waitForLoadState('load'), which would
-  // resolve immediately on the already-loaded page) so the option is persisted
-  // before the front-end header is read.
-  await Promise.all([
-    page.waitForResponse(
-      (r) =>
-        r.request().method() === "POST" &&
-        r.url().includes("page=sucuriscan_headers_management"),
-    ),
-    page.getByTestId("sucuriscan_headers_csp_control_submit_btn").click(),
-  ]);
+  // Click the submit button, then auto-wait for the confirmation alert that
+  // WordPress renders after a full-page POST round-trip.  Using the web-first
+  // toContainText assertion (rather than waitForResponse) guarantees the new
+  // DOM is stable and JavaScript has run before we interact with any inputs.
+  await page.getByTestId("sucuriscan_headers_csp_control_submit_btn").click();
+  await expect(page.locator(".sucuriscan-alert")).toContainText(
+    "Content Security Policy settings were updated.",
+  );
 }
 
 test.describe("Headers · Content-Security-Policy", () => {
   test.beforeAll(() => {
     // Reset to clean state before the suite so a previous interrupted run that
-    // left sucuriscan_enforced_default_src=1 doesn't break the first assertion.
+    // left any directive enforced doesn't break the first assertion.
+    // Disabling the mode stops header emission; deleting the options object
+    // causes the plugin to regenerate defaults (all enforced=false) on the next
+    // page load — which is the clean baseline the first test requires.
     updateOption("sucuriscan_headers_csp", "disabled");
-    updateOption("sucuriscan_enforced_default_src", "0");
+    deleteOption("sucuriscan_headers_csp_options");
   });
 
   test.afterAll(async ({ loggedOutRequest }) => {
     // Disable CSP so the live front-end stops emitting the Report-Only header,
-    // keeping re-runs and the CORS spec clean. (Mode disabled => early return
-    // in csp.lib.php, header gone, regardless of leftover enforced flags.)
+    // keeping re-runs and the CORS spec clean. Deleting the options object
+    // resets all enforced flags to their plugin defaults (all false), ensuring
+    // a subsequent run always starts from a known-clean state.
     updateOption("sucuriscan_headers_csp", "disabled");
-    updateOption("sucuriscan_enforced_default_src", "0");
+    deleteOption("sucuriscan_headers_csp_options");
     await expectHeaderAbsent(loggedOutRequest, "/", CSP_HEADER);
   });
 
@@ -163,18 +164,21 @@ test.describe("Headers · Content-Security-Policy", () => {
       "default-src 'none'; sandbox allow-forms allow-orientation-lock allow-popups",
     );
 
+    // submitCspForm above waits for the full-page reload confirmation, so the
+    // DOM is stable and JavaScript has enabled the sub-inputs (enforce_sandbox
+    // is checked after the save).  No { force: true } needed here.
     await page
       .locator("input[name='sucuriscan_csp_sandbox_allow-forms']")
-      .uncheck({ force: true });
+      .uncheck();
     await page
       .locator("input[name='sucuriscan_csp_sandbox_allow-popups']")
-      .uncheck({ force: true });
+      .uncheck();
     await page
       .locator("input[name='sucuriscan_csp_sandbox_allow-orientation-lock']")
-      .uncheck({ force: true });
+      .uncheck();
     await page
       .locator("input[name='sucuriscan_csp_sandbox_allow-same-origin']")
-      .check({ force: true });
+      .check();
 
     await submitCspForm(page);
 

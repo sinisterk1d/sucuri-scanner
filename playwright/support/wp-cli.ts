@@ -70,15 +70,32 @@ export function tryGetOption<T = unknown>(name: string): T | string | null {
   }
 }
 
-/** Update a wp_option to a scalar value. */
+/**
+ * Update a plugin option.
+ *
+ * The Sucuri Scanner plugin stores all sucuriscan_* options in its own flat
+ * file (wp-content/uploads/sucuri/sucuri-settings.php), NOT in the WordPress
+ * options table.  Using `wp option update` only writes to wp_options — the
+ * plugin never reads that and the update is silently ignored.  We call
+ * SucuriScanOption::updateOption() through `wp eval` so the write goes to the
+ * correct storage layer regardless of whether the option is a flat-file option,
+ * a secret option (wp-config.php), or a regular WP option.
+ */
 export function updateOption(name: string, value: string): void {
-  // Quote the value so spaces/special chars survive the shell.
-  wp(`option update ${name} ${JSON.stringify(value)}`);
+  wpEval(
+    `SucuriScanOption::updateOption(${JSON.stringify(name)}, ${JSON.stringify(value)});`,
+  );
 }
 
-/** Delete a wp_option, tolerating "option does not exist". */
+/**
+ * Delete a plugin option, tolerating absence.
+ *
+ * Same storage-layer reasoning as updateOption: route through
+ * SucuriScanOption::deleteOption() so flat-file and secret options are
+ * removed from the right place.
+ */
 export function deleteOption(name: string): void {
-  wpEnvRun(`wp option delete ${name} || true`);
+  wpEval(`SucuriScanOption::deleteOption(${JSON.stringify(name)});`);
 }
 
 /** Evaluate a short PHP one-liner via `wp eval` (avoid nested quotes — prefer a script file for complex PHP). */
