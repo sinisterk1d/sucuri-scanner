@@ -6,7 +6,11 @@
  * specs to assert response headers as an anonymous visitor (the Playwright
  * equivalent of `cy.clearCookies()` + `cy.request('/')`).
  */
-import { test as base, type APIRequestContext } from "@playwright/test";
+import {
+  test as base,
+  request as playwrightRequest,
+  type APIRequestContext,
+} from "@playwright/test";
 import { BASE_URL } from "./env";
 
 interface Fixtures {
@@ -14,16 +18,21 @@ interface Fixtures {
 }
 
 export const test = base.extend<Fixtures>({
-  // Use a real Chromium browser context (no storageState) so the request goes
-  // through the browser's HTTP stack — the direct equivalent of Cypress's
-  // cy.clearCookies() + cy.request('/').  A bare playwright.request.newContext()
-  // is a Node.js HTTP client that causes WordPress to misidentify the request
-  // (is_user_logged_in() returns true), producing no-cache headers even for
-  // anonymous front-end visits.
-  loggedOutRequest: async ({ browser }, use) => {
-    const context = await browser.newContext({ baseURL: BASE_URL });
-    await use(context.request);
-    await context.close();
+  // Truly anonymous request context. The crux: any context created inside a
+  // test (browser.newContext() OR request.newContext()) inherits the project's
+  // `use.storageState` — here the admin session — so it is silently logged IN.
+  // That makes WordPress's is_user_logged_in() true and the Cache-Control
+  // library serve its no-cache fallback even for front-end visits, masking the
+  // per-tier max-age the header specs assert. Passing an explicit empty
+  // storageState clears the inherited admin cookies so the request is anonymous,
+  // matching Cypress's cy.clearCookies() + cy.request('/').
+  loggedOutRequest: async ({}, use) => {
+    const context = await playwrightRequest.newContext({
+      baseURL: BASE_URL,
+      storageState: { cookies: [], origins: [] },
+    });
+    await use(context);
+    await context.dispose();
   },
 });
 

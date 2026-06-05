@@ -70,6 +70,20 @@ async function collapsePostsRowAndPersist(page: Page): Promise<void> {
   ]);
 }
 
+/**
+ * Assert the Cache-Control status box flipped to the green "Enabled" state.
+ * Scoped to the cache box's data-cy on purpose: the Headers page also renders
+ * CSP and CORS status boxes that share the `.sucuriscan-hstatus-1` class, and
+ * the row-collapse JS (`$('.sucuriscan-double-box-update')`) flips all three at
+ * once — so a bare `.sucuriscan-hstatus-1` locator matches 3 elements and trips
+ * Playwright strict mode (Cypress's `.contains()` silently took the first).
+ */
+async function expectCacheControlEnabled(page: Page): Promise<void> {
+  const box = page.getByTestId("sucuriscan_headers_cache_control");
+  await expect(box).toHaveClass(/sucuriscan-hstatus-1/);
+  await expect(box).toContainText("Enabled");
+}
+
 test.afterAll(() => {
   // Robust reset: drop both options so the plugin regenerates defaults
   // (mode 'disabled', posts.max_age=43200, posts.old_age_multiplier=0) on next
@@ -154,7 +168,7 @@ test("Can customize the Cache-Control header properly", async ({
   // Collapse the row (Update) -> AJAX persists posts.max_age=12345 and flips the
   // status box to Enabled. Await the POST so the header read below is committed.
   await collapsePostsRowAndPersist(page);
-  await expect(page.locator(".sucuriscan-hstatus-1")).toContainText("Enabled");
+  await expectCacheControlEnabled(page);
 
   await expectHeaderEquals(
     loggedOutRequest,
@@ -182,7 +196,7 @@ test("Can customize the old age multiplier for the Cache-Control header", async 
   await oldAgeMultiplier.click();
   await collapsePostsRowAndPersist(page);
 
-  await expect(page.locator(".sucuriscan-hstatus-1")).toContainText("Enabled");
+  await expectCacheControlEnabled(page);
 
   // Reload to confirm the checked state persisted to the option store.
   await page.goto(HEADERS_URL);
@@ -194,7 +208,7 @@ test("Can customize the old age multiplier for the Cache-Control header", async 
   await collapsePostsRowAndPersist(page);
 
   await expect(oldAgeMultiplier).not.toBeChecked();
-  await expect(page.locator(".sucuriscan-hstatus-1")).toContainText("Enabled");
+  await expectCacheControlEnabled(page);
 });
 
 test("Cache-Control header functionality pages protected by log in", async ({
