@@ -55,11 +55,19 @@ async function submitCspForm(page: Page): Promise<void> {
 }
 
 test.describe("Headers · Content-Security-Policy", () => {
+  test.beforeAll(() => {
+    // Reset to clean state before the suite so a previous interrupted run that
+    // left sucuriscan_enforced_default_src=1 doesn't break the first assertion.
+    updateOption("sucuriscan_headers_csp", "disabled");
+    updateOption("sucuriscan_enforced_default_src", "0");
+  });
+
   test.afterAll(async ({ loggedOutRequest }) => {
     // Disable CSP so the live front-end stops emitting the Report-Only header,
     // keeping re-runs and the CORS spec clean. (Mode disabled => early return
     // in csp.lib.php, header gone, regardless of leftover enforced flags.)
     updateOption("sucuriscan_headers_csp", "disabled");
+    updateOption("sucuriscan_enforced_default_src", "0");
     await expectHeaderAbsent(loggedOutRequest, "/", CSP_HEADER);
   });
 

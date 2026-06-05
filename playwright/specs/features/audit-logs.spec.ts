@@ -81,11 +81,20 @@ test("sends audit logs to the Sucuri servers (AJAX stubbed)", async ({
   });
 
   await page.goto(REPORTING_URL);
-  await page.getByTestId("sucuriscan_dashboard_send_audit_logs_submit").click();
 
-  await expect(
-    page.getByTestId("sucuriscan_auditlog_response_loading"),
-  ).toContainText("Loading...");
+  // Use Promise.all so we reliably catch the auditlogs_send_logs round-trip
+  // before asserting the result; the element does not transition through a
+  // "Loading..." state during send (it's only set during the initial page-load
+  // get_audit_logs call, which the stub resolves immediately).
+  await Promise.all([
+    page.waitForResponse(
+      (r) =>
+        r.url().includes("admin-ajax.php") &&
+        (r.request().postData() ?? "").includes("auditlogs_send_logs"),
+    ),
+    page.getByTestId("sucuriscan_dashboard_send_audit_logs_submit").click(),
+  ]);
+
   await expect(
     page.locator(".sucuriscan-auditlog-entry-title").first(),
   ).toContainText("User authentication succeeded: admin");

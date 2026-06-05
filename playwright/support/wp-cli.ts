@@ -83,7 +83,10 @@ export function deleteOption(name: string): void {
 
 /** Evaluate a short PHP one-liner via `wp eval` (avoid nested quotes — prefer a script file for complex PHP). */
 export function wpEval(php: string): string {
-  return wpEnvRun(`wp eval ${JSON.stringify(php)}`);
+  // Single-quote the PHP so the shell never expands $variables inside it.
+  // Literal single quotes in the PHP are escaped with the '"'"' pattern.
+  const escaped = php.replace(/'/g, "'\\''");
+  return wpEnvRun(`wp eval '${escaped}'`);
 }
 
 /** Read the full contents of wp-config.php (checks ABSPATH and its parent). */
