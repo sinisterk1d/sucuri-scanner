@@ -94,6 +94,13 @@ export class TwoFactorAdminPage {
 
     await this.selectUsers(users);
     await this.applyBulk(mode);
+    // Wait for the enforce reload to land before returning. applyBulk only
+    // clicks submit (click() does not await the POST/reload), so without this
+    // the helper returns while the option write is still in flight. Callers
+    // immediately open a fresh context and log in; if that login beats the
+    // `twofactor_mode=selected_users` write, the user isn't enforced and lands
+    // on wp-admin instead of the 2FA screen — the observed CI flake.
+    await this.expectBulkNotice();
   }
 
   /** Reset (force re-setup) 2FA for the given users without disabling enforcement. */
@@ -101,6 +108,11 @@ export class TwoFactorAdminPage {
     await this.goto();
     await this.selectUsers(users);
     await this.applyBulk("reset_selected");
+    // Same reasoning as setModeSelectedUsersFor: wait for the reload so the
+    // secret-wipe write completes before callers open a fresh context and log
+    // in expecting the SETUP screen. Otherwise a still-stored secret sends the
+    // login to VERIFY and the assertion fails.
+    await this.expectBulkNotice();
   }
 
   /** Canonical full reset: wipe every secret and disable enforcement. Safe teardown. */
