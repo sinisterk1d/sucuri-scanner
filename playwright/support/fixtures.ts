@@ -14,10 +14,16 @@ interface Fixtures {
 }
 
 export const test = base.extend<Fixtures>({
-  loggedOutRequest: async ({ playwright }, use) => {
-    const context = await playwright.request.newContext({ baseURL: BASE_URL });
-    await use(context);
-    await context.dispose();
+  // Use a real Chromium browser context (no storageState) so the request goes
+  // through the browser's HTTP stack — the direct equivalent of Cypress's
+  // cy.clearCookies() + cy.request('/').  A bare playwright.request.newContext()
+  // is a Node.js HTTP client that causes WordPress to misidentify the request
+  // (is_user_logged_in() returns true), producing no-cache headers even for
+  // anonymous front-end visits.
+  loggedOutRequest: async ({ browser }, use) => {
+    const context = await browser.newContext({ baseURL: BASE_URL });
+    await use(context.request);
+    await context.close();
   },
 });
 
