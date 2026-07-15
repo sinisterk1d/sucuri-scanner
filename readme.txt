@@ -8,7 +8,7 @@ Stable tag: 2.7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-The Sucuri WordPress Security plugin is a security toolset for security integrity monitoring, malware detection and security hardening.
+The Sucuri WordPress Security plugin is a security toolset for security integrity monitoring, malware detection and security hardening. Also, it makes your coffee in the morning. (Just kidding. We haven't figured that part out yet.)
 
 == Description ==
 
