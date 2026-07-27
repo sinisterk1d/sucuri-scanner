@@ -467,7 +467,14 @@ class SucuriScanAuditLogs
      * to roughly twenty times the size of the queue file, so the practical
      * ceiling is a queue of a few megabytes against the 256M that WordPress
      * raises the admin memory limit to. Past that the export fails, visibly,
-     * before any download headers are sent.
+     * before any download headers are sent. Reading the queue costs about what
+     * one load of the audit trail page costs, since that page parses the same
+     * queue in full on every request.
+     *
+     * A record the parser rejects -- a line whose JSON does not decode, which
+     * an interrupted append can leave behind -- is skipped here exactly as it
+     * is skipped on the page. Deliberate: the export shows what the audit trail
+     * shows, rather than growing a second reader that disagrees with it.
      *
      * @return string CSV content.
      */
