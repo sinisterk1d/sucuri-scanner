@@ -9,7 +9,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-07-27T21:11:51+00:00\n"
+"POT-Creation-Date: 2026-07-27T21:30:05+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: sucuri-scanner\n"
@@ -82,7 +82,7 @@ msgid "All Time"
 msgstr ""
 
 #: src/api.lib.php:534
-#: src/auditlogs.lib.php:619
+#: src/auditlogs.lib.php:654
 msgid "Today"
 msgstr ""
 
@@ -267,15 +267,15 @@ msgstr ""
 msgid "There are no logs."
 msgstr ""
 
-#: src/auditlogs.lib.php:362
+#: src/auditlogs.lib.php:363
 msgid "status has been changed"
 msgstr ""
 
-#: src/auditlogs.lib.php:410
+#: src/auditlogs.lib.php:411
 msgid "The audit trail download link is invalid or expired."
 msgstr ""
 
-#: src/auditlogs.lib.php:411
+#: src/auditlogs.lib.php:412
 msgid "Audit trail export"
 msgstr ""
 
