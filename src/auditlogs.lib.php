@@ -415,6 +415,18 @@ class SucuriScanAuditLogs
         }
 
         /**
+         * admin-post.php loads wp-admin/includes/admin.php, not
+         * wp-admin/admin.php, so unlike every admin screen it never raises the
+         * memory limit for itself and runs at WP_MEMORY_LIMIT -- 40M on a
+         * single site. Asking for the admin allowance here is what the API is
+         * for, and it is what the ceiling documented on getAuditLogsCsv()
+         * assumes.
+         */
+        if (function_exists('wp_raise_memory_limit')) {
+            wp_raise_memory_limit('admin');
+        }
+
+        /**
          * Built before a single header goes out. Reading the queue is the
          * expensive part of the export, and a failure there once the download
          * headers were already on the wire reached the browser as a complete
@@ -464,12 +476,12 @@ class SucuriScanAuditLogs
      *
      * The whole queue is held in memory while the CSV is assembled, which is
      * what reusing the audit page's parser buys in simplicity. Peak usage runs
-     * to roughly twenty times the size of the queue file, so the practical
-     * ceiling is a queue of a few megabytes against the 256M that WordPress
-     * raises the admin memory limit to. Past that the export fails, visibly,
-     * before any download headers are sent. Reading the queue costs about what
-     * one load of the audit trail page costs, since that page parses the same
-     * queue in full on every request.
+     * to roughly twenty times the size of the queue file, so with the admin
+     * allowance downloadAuditLogs() asks for -- WP_MAX_MEMORY_LIMIT, 256M by
+     * default -- the practical ceiling is a queue around ten megabytes. Past
+     * that the export fails, visibly, before any download headers are sent.
+     * Reading the queue costs about what one load of the audit trail page
+     * costs, since that page parses the same queue in full on every request.
      *
      * A record the parser rejects -- a line whose JSON does not decode, which
      * an interrupted append can leave behind -- is skipped here exactly as it

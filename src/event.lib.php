@@ -164,7 +164,15 @@ class SucuriScanEvent extends SucuriScan
          */
         $boundary = '(?:(?!,\s*["\']?[a-z0-9_-]{1,64}["\']?\s*[:=])[^;&}\r\n])*';
         $quoted = '/((?:^|[,{;\s])["\']?' . $field . '["\']?\s*[:=]\s*)(["\'])(.*?)\2/i';
-        $plain = '/((?:^|[;,&?\s{])["\']?' . $field . '["\']?\s*[:=]\s*)(?!["\'])(' . $boundary . ')/i';
+
+        /**
+         * Whitespace is excluded from the lookahead as well as the quotes it
+         * guards against. Without it the engine backtracks the preceding "\s*"
+         * to nothing, finds a space rather than a quote, and matches after all
+         * -- which re-masks a value the quoted pattern has already handled and
+         * strips the quotes off it on the way through.
+         */
+        $plain = '/((?:^|[;,&?\s{])["\']?' . $field . '["\']?\s*[:=]\s*)(?![\s"\'])(' . $boundary . ')/i';
 
         /**
          * Each result is checked before it is reused as the next subject: PHP

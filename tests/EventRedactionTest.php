@@ -194,6 +194,21 @@ final class EventRedactionTest extends TestCase
         $this->assertStringContainsString('italic', $stored);
     }
 
+    public function testKeepsTheShapeOfAQuotedCredentialField()
+    {
+        /**
+         * The quoted pattern masks between the quotes and leaves them in place.
+         * The unquoted pattern used to re-match the result -- backtracking its
+         * leading "\s*" to nothing so a space satisfied the "not a quote"
+         * guard -- and strip both the quotes and the space back off.
+         */
+        $stored = $this->report('Config saved; "password": "s3cr3t"; other: keep');
+
+        $this->assertStringNotContainsString('s3cr3t', $stored);
+        $this->assertStringContainsString('"password": "[redacted]"', $stored);
+        $this->assertStringContainsString('other: keep', $stored);
+    }
+
     public function testMasksACredentialHiddenBehindItsEncoding()
     {
         /**
