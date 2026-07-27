@@ -339,7 +339,7 @@ class SucuriScanAuditLogs
                 'AuditLog.Date' => SucuriScan::datetime($audit_log['timestamp'], 'M d, Y'),
                 'AuditLog.Username' => $audit_log['username'],
                 'AuditLog.Address' => $audit_log['remote_addr'],
-                'AuditLog.Message' => $audit_log['message'],
+                'AuditLog.Message' => self::plainText($audit_log['message']),
                 'AuditLog.Extra' => '',
             );
 
@@ -352,7 +352,8 @@ class SucuriScanAuditLogs
                 $snippet_data['AuditLog.Extra'] .= '<ul class="sucuriscan-list-as-table">';
 
                 foreach ($audit_log['file_list'] as $log_extra) {
-                    $snippet_data['AuditLog.Extra'] .= '<li>' . SucuriScan::escape($log_extra) . '</li>';
+                    $snippet_data['AuditLog.Extra'] .= '<li>'
+                        . SucuriScan::escape(self::plainText($log_extra)) . '</li>';
                 }
 
                 $snippet_data['AuditLog.Extra'] .= '</ul>';
@@ -427,7 +428,14 @@ class SucuriScanAuditLogs
         header('Content-Type: text/csv; charset=utf-8');
         header('Content-Disposition: attachment; filename="' . $filename . '"');
         header('X-Content-Type-Options: nosniff');
-        header('Content-Length: ' . strlen($csv));
+
+        /**
+         * No Content-Length on purpose. Anything that has already written to
+         * the response -- a stray notice, a plugin echoing on admin_init --
+         * makes the declared length disagree with the body, and the browser
+         * then saves a CSV cut short at that offset. Letting the connection
+         * close instead keeps a noisy download complete.
+         */
 
         // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
         echo $csv;
@@ -480,15 +488,19 @@ class SucuriScanAuditLogs
         );
 
         foreach ($logs as $log) {
+            $details = isset($log['file_list'])
+                ? array_map(array('SucuriScanAuditLogs', 'plainText'), (array) $log['file_list'])
+                : array();
+
             $csv .= self::auditLogCsvRow(
                 array(
                     isset($log['date']) ? $log['date'] : '',
                     isset($log['time']) ? $log['time'] : '',
                     isset($log['event']) ? $log['event'] : '',
-                    isset($log['username']) ? $log['username'] : '',
+                    self::plainText(isset($log['username']) ? $log['username'] : ''),
                     isset($log['remote_addr']) ? $log['remote_addr'] : '',
-                    isset($log['message']) ? $log['message'] : '',
-                    isset($log['file_list']) ? implode(";\x20", (array) $log['file_list']) : '',
+                    self::plainText(isset($log['message']) ? $log['message'] : ''),
+                    implode(";\x20", $details),
                 )
             );
         }
@@ -584,6 +596,24 @@ class SucuriScanAuditLogs
     }
 
     /**
+     * Decode an audit trail value back to the text the event described.
+     *
+     * Hooks build their messages out of values passed through
+     * SucuriScan::escape(), so a plugin named "A<B" is stored as "A&lt;B".
+     * Every consumer escapes again on the way out -- the template through its
+     * "%%...%%" tag, the CSV writer by quoting -- which would show the reader
+     * the entity rather than the character. Decoding once here is what makes
+     * the two agree; callers must still escape for their own medium.
+     *
+     * @param mixed $value Stored audit trail value.
+     * @return string Decoded text.
+     */
+    private static function plainText($value)
+    {
+        return html_entity_decode((string) $value, ENT_QUOTES, 'UTF-8');
+    }
+
+    /**
      * Format the file list shown for a "status has been changed" audit entry.
      *
      * The result is assigned to AuditLog.Extra, which the audit-log template renders
@@ -595,9 +625,14 @@ class SucuriScanAuditLogs
      */
     private static function formatChangedStatusFiles($file_list)
     {
+        $entries = array_map(
+            array('SucuriScanAuditLogs', 'plainText'),
+            (array) $file_list
+        );
+
         return implode(
             ",\x20",
-            array_map(array('SucuriScan', 'escape'), (array) $file_list)
+            array_map(array('SucuriScan', 'escape'), $entries)
         );
     }
 

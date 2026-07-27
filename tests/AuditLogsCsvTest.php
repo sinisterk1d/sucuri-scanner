@@ -223,6 +223,37 @@ final class AuditLogsCsvTest extends TestCase
         $this->assertSame($unfiltered, $this->rows($this->csv()));
     }
 
+    public function testExportsNamesAsTheTextTheEventDescribed()
+    {
+        /**
+         * Hooks build messages out of values passed through
+         * SucuriScan::escape(), so a plugin named "R&D <Tools>" reaches the
+         * queue entity-encoded. A CSV is data, not markup: the reader has to
+         * get the characters back, not the entities.
+         */
+        $this->storeAuditTrail(
+            'Warning: admin, 1.2.3.4; Plugin activated: R&amp;D &lt;Tools&gt; (v1.0; rd/rd.php)'
+        );
+
+        $csv = $this->csv();
+
+        $this->assertStringContainsString('Plugin activated: R&D <Tools>', $csv);
+        $this->assertStringNotContainsString('&amp;', $csv);
+        $this->assertStringNotContainsString('&lt;', $csv);
+    }
+
+    public function testExportsDetailColumnsAsPlainTextToo()
+    {
+        $this->storeAuditTrail(
+            'Notice: admin, 1.2.3.4; Post status has been changed; details: ID: 3,Title: Ben &amp; Jerry'
+        );
+
+        $csv = $this->csv();
+
+        $this->assertStringContainsString('Ben & Jerry', $csv);
+        $this->assertStringNotContainsString('&amp;', $csv);
+    }
+
     public function testNeverExportsStoredCredentials()
     {
         /**
