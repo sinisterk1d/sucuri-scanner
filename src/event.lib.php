@@ -466,21 +466,30 @@ class SucuriScanEvent extends SucuriScan
             $username = sprintf("\x20%s,", $user->user_login);
         }
 
+        /**
+         * The severity prefix is part of the stored record, not of the user
+         * interface. parseAuditLogs() reads it back and discards any entry
+         * whose level it does not recognise, so translating it here would make
+         * every trail written by a non-English site vanish from the audit page
+         * and from the CSV export. Nothing user facing is lost: the page uses
+         * the parsed level as a CSS class, and the severity names shown in the
+         * filter dropdown are translated by SucuriScanAPI::getFilters().
+         */
         $severity = intval($severity);
-        $severity_name = __('Info', 'sucuri-scanner');
+        $severity_name = 'Info';
         $severities = array(
             /* 0 */
-            __('Debug', 'sucuri-scanner'),
+            'Debug',
             /* 1 */
-            __('Notice', 'sucuri-scanner'),
+            'Notice',
             /* 2 */
-            __('Info', 'sucuri-scanner'),
+            'Info',
             /* 3 */
-            __('Warning', 'sucuri-scanner'),
+            'Warning',
             /* 4 */
-            __('Error', 'sucuri-scanner'),
+            'Error',
             /* 5 */
-            __('Critical', 'sucuri-scanner'),
+            'Critical',
         );
 
         if (isset($severities[$severity])) {
