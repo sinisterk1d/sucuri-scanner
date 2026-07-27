@@ -754,7 +754,17 @@ class SucuriScanAPI extends SucuriScanOption
                 implode("\x20", (array) $log['file_list']),
             );
 
-            if (stripos(implode("\x20", $searchable), $frontend_filters['search']) === false) {
+            /**
+             * The haystack is decoded, not the needle. Hooks store names
+             * through SucuriScan::escape(), so a plugin called "R&D Tools" is
+             * on disk as "R&amp;D Tools"; the search term arrives decoded, and
+             * comparing the two raw would never match. Decoding here keeps the
+             * stored term escaped for the filter input and the pagination
+             * links, which escape it again on their way back out.
+             */
+            $haystack = html_entity_decode(implode("\x20", $searchable), ENT_QUOTES, 'UTF-8');
+
+            if (stripos($haystack, $frontend_filters['search']) === false) {
                 return false;
             }
         }
