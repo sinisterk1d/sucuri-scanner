@@ -1378,6 +1378,65 @@ describe("Run e2e tests", () => {
         // cy.get('.sucuriscan-auditlog-entry').should('have.length.greaterThan', 0);
     });
 
+    it('can search audit trails', () => {
+        cy.visit('/wp-admin/admin.php?page=sucuriscan_events_reporting#auditlogs');
+
+        cy.get('.sucuriscan-auditlog-entry').should('have.length.greaterThan', 0);
+        cy.get('[data-cy=sucuriscan_auditlogs_search]').type('Plugin activated{enter}');
+
+        cy.get('.sucuriscan-auditlog-entry').each(($row) => {
+            cy.wrap($row).find('.sucuriscan-auditlog-entry-title').should('contain.text', 'Plugin activated');
+        });
+
+        cy.get('[data-cy=sucuriscan_auditlogs_clear_filter_button]').click();
+
+        cy.wait(200);
+
+        cy.get('[data-cy=sucuriscan_auditlogs_search]').should('have.value', '');
+    });
+
+    it('can download every stored audit trail as CSV', () => {
+        cy.visit('/wp-admin/admin.php?page=sucuriscan_events_reporting#auditlogs');
+
+        // The export is a plain nonced link, so no JavaScript is involved.
+        cy.get('[data-cy=sucuriscan_auditlogs_download_link]')
+            .should('have.attr', 'href')
+            .then((href) => {
+                const url = new URL(href, Cypress.config('baseUrl'));
+
+                expect(url.pathname).to.equal('/wp-admin/admin-post.php');
+                expect(url.searchParams.get('action')).to.equal('sucuriscan_download_audit_logs');
+                expect(url.searchParams.get('sucuriscan_page_nonce')).to.match(/^[a-z0-9]{10}$/);
+
+                return cy.request(url.toString());
+            })
+            .then((response) => {
+                expect(response.headers['content-type']).to.include('text/csv');
+                expect(response.headers['content-disposition']).to.include('attachment;');
+
+                const lines = response.body.split('\r\n').filter((line) => line !== '');
+
+                expect(lines[0]).to.equal(
+                    '"Date","Time","Severity","Username","IP Address","Message","Details"',
+                );
+                expect(lines.length).to.be.greaterThan(1);
+
+                // The queue is a PHP file; its guard block is not data.
+                expect(response.body).to.not.contain('<?php');
+                expect(response.body).to.not.contain('exit(0)');
+            });
+
+        // A forged nonce must never produce a CSV.
+        cy.request({
+            url: '/wp-admin/admin-post.php?action=sucuriscan_download_audit_logs'
+                + '&sucuriscan_page_nonce=aaaaaaaaaa',
+            failOnStatusCode: false,
+        }).then((response) => {
+            expect(response.status).to.equal(403);
+            expect(response.headers['content-type']).to.not.include('text/csv');
+        });
+    });
+
     it("Toggling enforce checkbox enables/disables inputs interactively", () => {
         cy.visit("/wp-admin/admin.php?page=sucuriscan_headers_management");
 

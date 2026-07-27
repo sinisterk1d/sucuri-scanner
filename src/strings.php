@@ -34,6 +34,8 @@ __('Search audit trails', 'sucuri-scanner');
 __('Results are limited to the latest audit trails available.', 'sucuri-scanner');
 __('Filter', 'sucuri-scanner');
 __('Clear Filters', 'sucuri-scanner');
+__('The CSV contains all audit trails currently stored on this website.', 'sucuri-scanner');
+__('Download CSV', 'sucuri-scanner');
 
 // base.html.tpl
 __('Sucuri Security', 'sucuri-scanner');

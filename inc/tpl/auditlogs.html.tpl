@@ -223,6 +223,14 @@
     <div class="sucuriscan-auditlog-table">
         <div id="sucuriscan-filters"></div>
 
+        <div class="sucuriscan-hstatus sucuriscan-hstatus-2">
+            <p>
+                {{The CSV contains all audit trails currently stored on this website.}}
+                <a id="download-auditlogs-link" href="%%SUCURI.AuditLogs.DownloadURL%%"
+                   data-cy="sucuriscan_auditlogs_download_link">{{Download CSV}}</a>
+            </p>
+        </div>
+
         <div class="sucuriscan-auditlog-response" data-cy="sucuriscan_auditlog_response_loading">
             <em>{{Loading...}}</em>
         </div>

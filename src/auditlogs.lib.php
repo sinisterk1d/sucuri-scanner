@@ -47,6 +47,19 @@ class SucuriScanAuditLogs
 
         $params['AuditLogs.Lifetime'] = SUCURISCAN_AUDITLOGS_LIFETIME;
 
+        /**
+         * The export is a plain link, so the nonce travels in the href. The
+         * template renders this through the escaped "%%...%%" tag, which turns
+         * the query separators into "&amp;" as an HTML attribute requires.
+         */
+        $params['AuditLogs.DownloadURL'] = add_query_arg(
+            array(
+                'action' => 'sucuriscan_download_audit_logs',
+                'sucuriscan_page_nonce' => wp_create_nonce('sucuriscan_page_nonce'),
+            ),
+            admin_url('admin-post.php')
+        );
+
         return SucuriScanTemplate::getSection('auditlogs', $params);
     }
 
@@ -369,6 +382,139 @@ class SucuriScanAuditLogs
         }
 
         wp_send_json($response, 200);
+    }
+
+    /**
+     * Send every audit trail stored on this website to the browser as a CSV.
+     *
+     * The filters on the audit trail page deliberately do not apply here; the
+     * export is always the complete local history.
+     *
+     * @codeCoverageIgnore - The method ends the request with exit(), which a
+     * test runner cannot survive. Everything it decides is delegated to
+     * canDownloadAuditLogs() and getAuditLogsCsv(), both of which are covered.
+     *
+     * @return void
+     */
+    public static function downloadAuditLogs()
+    {
+        SucuriScanInterface::checkPageVisibility();
+
+        if (!self::canDownloadAuditLogs()) {
+            wp_die(
+                esc_html__('The audit trail download link is invalid or expired.', 'sucuri-scanner'),
+                esc_html__('Audit trail export', 'sucuri-scanner'),
+                array('response' => 403, 'back_link' => true)
+            );
+        }
+
+        $filename = 'sucuri-audit-trails-' . SucuriScan::datetime(null, 'Y-m-d') . '.csv';
+
+        nocache_headers();
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('X-Content-Type-Options: nosniff');
+
+        // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+        echo self::getAuditLogsCsv();
+
+        exit(0);
+    }
+
+    /**
+     * Check the nonce that authorizes an audit trail export.
+     *
+     * @return bool Whether the request carries a valid download nonce.
+     */
+    private static function canDownloadAuditLogs()
+    {
+        $nonce = SucuriScanRequest::get('sucuriscan_page_nonce', '_nonce');
+
+        return (bool) ($nonce && wp_verify_nonce($nonce, 'sucuriscan_page_nonce'));
+    }
+
+    /**
+     * Build a CSV with every audit trail stored on this website.
+     *
+     * The logs are read from the local queue file, whose leading PHP guard
+     * block is already discarded by SucuriScanCache while it parses the
+     * datastore, so only real records reach the export.
+     *
+     * @return string CSV content.
+     */
+    private static function getAuditLogsCsv()
+    {
+        $auditlogs = SucuriScanAPI::getAuditLogsFromQueue();
+        $logs = (is_array($auditlogs) && isset($auditlogs['output_data']))
+            ? (array) $auditlogs['output_data']
+            : array();
+
+        usort($logs, array('SucuriScanAuditLogs', 'sortByDate'));
+
+        $csv = self::auditLogCsvRow(
+            array('Date', 'Time', 'Severity', 'Username', 'IP Address', 'Message', 'Details')
+        );
+
+        foreach ($logs as $log) {
+            $csv .= self::auditLogCsvRow(
+                array(
+                    isset($log['date']) ? $log['date'] : '',
+                    isset($log['time']) ? $log['time'] : '',
+                    isset($log['event']) ? $log['event'] : '',
+                    isset($log['username']) ? $log['username'] : '',
+                    isset($log['remote_addr']) ? $log['remote_addr'] : '',
+                    isset($log['message']) ? $log['message'] : '',
+                    isset($log['file_list']) ? implode(";\x20", (array) $log['file_list']) : '',
+                )
+            );
+        }
+
+        return $csv;
+    }
+
+    /**
+     * Write one RFC 4180 CSV row.
+     *
+     * Every field is quoted and every embedded quote is doubled, which is all
+     * the escaping the format needs; fputcsv() is avoided because its handling
+     * of the escape character changed between the PHP versions this plugin
+     * supports.
+     *
+     * @param array $fields CSV field values.
+     * @return string One CSV row, terminated with CRLF.
+     */
+    private static function auditLogCsvRow($fields)
+    {
+        $quoted = array();
+
+        foreach ((array) $fields as $value) {
+            $value = self::spreadsheetSafeValue($value);
+            $quoted[] = '"' . str_replace('"', '""', $value) . '"';
+        }
+
+        return implode(',', $quoted) . "\r\n";
+    }
+
+    /**
+     * Prevent spreadsheet applications from evaluating exported values.
+     *
+     * @param mixed $value CSV field value.
+     * @return string Safe CSV field value.
+     */
+    private static function spreadsheetSafeValue($value)
+    {
+        $value = (string) $value;
+
+        /**
+         * "|" and "%" open a DDE link in LibreOffice Calc and older versions of
+         * Excel, so they need the same treatment as the four characters that
+         * start a formula.
+         */
+        if (preg_match('/^[\x00-\x20]*[=+\-@|%]/', $value)) {
+            return "'" . $value;
+        }
+
+        return $value;
     }
 
     /**
