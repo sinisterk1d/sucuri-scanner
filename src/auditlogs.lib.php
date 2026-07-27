@@ -398,7 +398,8 @@ class SucuriScanAuditLogs
      *
      * @codeCoverageIgnore - The method ends the request with exit(), which a
      * test runner cannot survive. Everything it decides is delegated to
-     * canDownloadAuditLogs() and getAuditLogsCsv(), both of which are covered.
+     * canDownloadAuditLogs() and writeAuditLogsCsv(), both of which are
+     * covered.
      *
      * @return void
      */
@@ -415,25 +416,26 @@ class SucuriScanAuditLogs
         }
 
         /**
-         * admin-post.php loads wp-admin/includes/admin.php, not
-         * wp-admin/admin.php, so unlike every admin screen it never raises the
-         * memory limit for itself and runs at WP_MEMORY_LIMIT -- 40M on a
-         * single site. Asking for the admin allowance here is what the API is
-         * for, and it is what the ceiling documented on getAuditLogsCsv()
-         * assumes.
+         * Assembled into a scratch stream, not a string, and completed before a
+         * single header goes out. Two things fall out of that: the response
+         * never holds the whole export in memory, and a failure while reading
+         * the queue surfaces as an ordinary error page instead of reaching the
+         * browser as a complete-looking but truncated CSV.
          */
-        if (function_exists('wp_raise_memory_limit')) {
-            wp_raise_memory_limit('admin');
+        $buffer = self::openCsvBuffer();
+
+        if (!is_resource($buffer) || !self::writeAuditLogsCsv($buffer)) {
+            if (is_resource($buffer)) {
+                fclose($buffer); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose
+            }
+
+            wp_die(
+                esc_html__('The audit trails could not be read. No CSV was downloaded.', 'sucuri-scanner'),
+                esc_html__('Audit trail export', 'sucuri-scanner'),
+                array('response' => 500, 'back_link' => true)
+            );
         }
 
-        /**
-         * Built before a single header goes out. Reading the queue is the
-         * expensive part of the export, and a failure there once the download
-         * headers were already on the wire reached the browser as a complete
-         * but silently truncated CSV; now it surfaces as an ordinary error page
-         * and no file is saved.
-         */
-        $csv = self::getAuditLogsCsv();
         $filename = 'sucuri-audit-trails-' . SucuriScan::datetime(null, 'Y-m-d') . '.csv';
 
         nocache_headers();
@@ -449,10 +451,26 @@ class SucuriScanAuditLogs
          * close instead keeps a noisy download complete.
          */
 
-        // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
-        echo $csv;
+        rewind($buffer);
+        fpassthru($buffer);
+        fclose($buffer); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose
 
         exit(0);
+    }
+
+    /**
+     * Open the scratch stream the CSV is assembled into.
+     *
+     * php://temp keeps the first couple of megabytes in memory and spills the
+     * rest to a temporary file, so the size of the export stops mattering to
+     * the memory limit. It is cleaned up when the handle closes.
+     *
+     * @return resource|bool Writable stream, or false when it cannot be opened.
+     */
+    private static function openCsvBuffer()
+    {
+        // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen
+        return @fopen('php://temp/maxmemory:' . (2 * 1024 * 1024), 'w+');
     }
 
     /**
@@ -468,63 +486,173 @@ class SucuriScanAuditLogs
     }
 
     /**
-     * Build a CSV with every audit trail stored on this website.
+     * Write every audit trail stored on this website to a stream as CSV.
      *
-     * The logs are read from the local queue file, whose leading PHP guard
-     * block is already discarded by SucuriScanCache while it parses the
-     * datastore, so only real records reach the export.
+     * The queue is read a line at a time and each record is converted and
+     * written before the next one is read, so peak memory is a function of the
+     * longest single entry rather than of the size of the queue. That matters
+     * because admin-post.php loads wp-admin/includes/admin.php rather than
+     * wp-admin/admin.php, and so never raises the memory limit the way an admin
+     * screen does: this runs at WP_MEMORY_LIMIT, 40M on a single site, and a
+     * site that has never had an API key configured accumulates the queue
+     * indefinitely because only sendLogsFromQueue() ever drains it.
      *
-     * The whole queue is held in memory while the CSV is assembled, which is
-     * what reusing the audit page's parser buys in simplicity. Peak usage runs
-     * to roughly twenty times the size of the queue file, so with the admin
-     * allowance downloadAuditLogs() asks for -- WP_MAX_MEMORY_LIMIT, 256M by
-     * default -- the practical ceiling is a queue around ten megabytes. Past
-     * that the export fails, visibly, before any download headers are sent.
-     * Reading the queue costs about what one load of the audit trail page
-     * costs, since that page parses the same queue in full on every request.
+     * Rows come out oldest first, in the order the events were recorded. The
+     * audit page sorts newest first, but sorting means holding every record at
+     * once, which is the cost this method exists to avoid; chronological order
+     * is the natural one for a log file anyway.
      *
      * A record the parser rejects -- a line whose JSON does not decode, which
      * an interrupted append can leave behind -- is skipped here exactly as it
      * is skipped on the page. Deliberate: the export shows what the audit trail
      * shows, rather than growing a second reader that disagrees with it.
      *
-     * @return string CSV content.
+     * @param resource $stream Writable stream to receive the CSV.
+     * @return bool Whether the whole queue was read and written.
      */
-    private static function getAuditLogsCsv()
+    private static function writeAuditLogsCsv($stream)
     {
-        $auditlogs = SucuriScanAPI::getAuditLogsFromQueue();
-        $logs = (is_array($auditlogs) && isset($auditlogs['output_data']))
-            ? (array) $auditlogs['output_data']
-            : array();
-
-        /* the raw log strings are a second full copy of the queue */
-        unset($auditlogs);
-
-        usort($logs, array('SucuriScanAuditLogs', 'sortByDate'));
-
-        $csv = self::auditLogCsvRow(
+        $written = self::writeCsvRow(
+            $stream,
             array('Date', 'Time', 'Severity', 'Username', 'IP Address', 'Message', 'Details')
         );
 
-        foreach ($logs as $log) {
-            $details = isset($log['file_list'])
-                ? array_map(array('SucuriScanAuditLogs', 'plainText'), (array) $log['file_list'])
-                : array();
-
-            $csv .= self::auditLogCsvRow(
-                array(
-                    isset($log['date']) ? $log['date'] : '',
-                    isset($log['time']) ? $log['time'] : '',
-                    isset($log['event']) ? $log['event'] : '',
-                    self::plainText(isset($log['username']) ? $log['username'] : ''),
-                    isset($log['remote_addr']) ? $log['remote_addr'] : '',
-                    self::plainText(isset($log['message']) ? $log['message'] : ''),
-                    implode(";\x20", $details),
-                )
-            );
+        if (!$written) {
+            return false;
         }
 
-        return $csv;
+        $cache = new SucuriScanCache('auditqueue');
+        $finfo = $cache->getDatastoreInfo();
+        $path = is_array($finfo) && isset($finfo['fpath']) ? $finfo['fpath'] : '';
+
+        if (!$path || !is_readable($path)) {
+            /* nothing has ever been logged; an empty export is still valid */
+            return true;
+        }
+
+        // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen
+        $handle = @fopen($path, 'r');
+
+        if ($handle === false) {
+            return false;
+        }
+
+        $started = false;
+
+        while (($line = fgets($handle)) !== false) {
+            /**
+             * The datastore is a PHP file that stops its own execution when it
+             * is requested directly. Everything up to and including the line
+             * that closes that block is the guard, not data.
+             */
+            if (!$started) {
+                $started = strpos($line, '?>') !== false;
+                continue;
+            }
+
+            $log = self::parseQueueLine($line);
+
+            if ($log === null) {
+                continue;
+            }
+
+            if (!self::writeAuditLogRow($stream, $log)) {
+                $written = false;
+                break;
+            }
+        }
+
+        fclose($handle); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose
+
+        return $written;
+    }
+
+    /**
+     * Convert one raw datastore line into a parsed audit trail.
+     *
+     * The line is handed to the same parser the audit page uses, one record at
+     * a time, so the export cannot drift from what the page shows -- redaction
+     * included.
+     *
+     * @param string $line Raw datastore line.
+     * @return array|null Parsed audit trail, or null when the line is not one.
+     */
+    private static function parseQueueLine($line)
+    {
+        $line = trim($line);
+        $separator = strpos($line, ':');
+
+        if ($line === '' || $separator === false) {
+            return null;
+        }
+
+        $key = substr($line, 0, $separator);
+        $message = json_decode(substr($line, $separator + 1), true);
+
+        if (!is_string($message)) {
+            return null; /* incompatible JSON data */
+        }
+
+        $offset = strpos($key, '_');
+        $timestamp = $offset === false ? $key : substr($key, 0, $offset);
+
+        $parsed = SucuriScanAPI::filterAuditLogs(
+            array(
+                'output' => array(
+                    sprintf(
+                        '%s %s : %s',
+                        SucuriScan::datetime($timestamp, 'Y-m-d H:i:s'),
+                        SucuriScan::getSiteEmail(),
+                        $message
+                    ),
+                ),
+                'total_entries' => 1,
+                'from_queue' => '1',
+            )
+        );
+
+        return isset($parsed['output_data'][0]) ? $parsed['output_data'][0] : null;
+    }
+
+    /**
+     * Write one parsed audit trail as a CSV row.
+     *
+     * @param resource $stream Writable stream.
+     * @param array    $log    Parsed audit trail.
+     * @return bool Whether the complete row was written.
+     */
+    private static function writeAuditLogRow($stream, $log)
+    {
+        $details = isset($log['file_list'])
+            ? array_map(array('SucuriScanAuditLogs', 'plainText'), (array) $log['file_list'])
+            : array();
+
+        return self::writeCsvRow(
+            $stream,
+            array(
+                isset($log['date']) ? $log['date'] : '',
+                isset($log['time']) ? $log['time'] : '',
+                isset($log['event']) ? $log['event'] : '',
+                self::plainText(isset($log['username']) ? $log['username'] : ''),
+                isset($log['remote_addr']) ? $log['remote_addr'] : '',
+                self::plainText(isset($log['message']) ? $log['message'] : ''),
+                implode(";\x20", $details),
+            )
+        );
+    }
+
+    /**
+     * Write one RFC 4180 CSV row to a stream.
+     *
+     * @param resource $stream Writable stream.
+     * @param array    $fields CSV field values.
+     * @return bool Whether the complete row was written.
+     */
+    private static function writeCsvRow($stream, $fields)
+    {
+        $row = self::auditLogCsvRow($fields);
+
+        return fwrite($stream, $row) === strlen($row);
     }
 
     /**

@@ -79,11 +79,26 @@ final class AuditLogsCsvTest extends TestCase
     /**
      * Build the CSV export from the audit queue fixture.
      *
+     * Driven through the same scratch stream downloadAuditLogs() writes into,
+     * so the export is exercised as it actually runs.
+     *
      * @return string Generated CSV.
      */
     private function csv(): string
     {
-        return (string) $this->invoke('getAuditLogsCsv');
+        $stream = $this->invoke('openCsvBuffer');
+
+        $this->assertIsResource($stream, 'the CSV scratch stream could not be opened');
+        $this->assertTrue(
+            (bool) $this->invoke('writeAuditLogsCsv', array($stream)),
+            'the audit queue could not be read'
+        );
+
+        rewind($stream);
+        $csv = (string) stream_get_contents($stream);
+        fclose($stream);
+
+        return $csv;
     }
 
     /**
@@ -110,7 +125,7 @@ final class AuditLogsCsvTest extends TestCase
      * an expectation taken from the same call the export makes could not
      * detect a fault in that call.
      *
-     * @return array Stored messages, keyed by datastore key.
+     * @return array Stored messages, one entry per record line.
      */
     private function storedAuditTrails(): array
     {
@@ -124,8 +139,15 @@ final class AuditLogsCsvTest extends TestCase
             $message = json_decode($parts[2], true);
 
             if (is_string($message)) {
-                /* duplicate keys collapse in the datastore, as they do on read */
-                $records[$parts[1]] = $message;
+                /**
+                 * A list, not a map: the export reads the queue line by line,
+                 * so two records sharing a datastore key are two rows. The
+                 * audit page collapses them, because the keyed reader it uses
+                 * builds a map -- but matching that would mean holding every
+                 * key in memory, which is the cost the streaming export exists
+                 * to avoid.
+                 */
+                $records[] = $parts[1] . ' ' . $message;
             }
         }
 
@@ -136,7 +158,11 @@ final class AuditLogsCsvTest extends TestCase
     {
         $csv = $this->csv();
 
-        foreach ($this->storedAuditTrails() as $key => $message) {
+        foreach ($this->storedAuditTrails() as $record) {
+            /* the key was prefixed for the failure message; drop it again */
+            $message = substr($record, strpos($record, ' ') + 1);
+            $key = strtok($record, ' ');
+
             /* "Severity: user, ip; " is split into its own columns */
             $body = substr($message, strpos($message, ';') + 2);
 
@@ -150,6 +176,35 @@ final class AuditLogsCsvTest extends TestCase
                 $probe,
                 $csv,
                 sprintf('audit trail %s is missing from the export', $key)
+            );
+        }
+    }
+
+    public function testExportsRowsInTheOrderTheyWereRecorded()
+    {
+        /**
+         * The audit page sorts newest first, but sorting means holding every
+         * record at once. The export streams instead, so rows come out in the
+         * order the queue holds them -- which on a real site, where every
+         * append carries the microtime of the event, is chronological.
+         */
+        $rows = $this->rows($this->csv());
+        array_shift($rows); /* drop the header */
+
+        $stored = $this->storedAuditTrails();
+
+        $this->assertGreaterThan(1, count($stored));
+        $this->assertCount(count($stored), $rows);
+
+        foreach ($stored as $index => $record) {
+            $message = substr($record, strpos($record, ' ') + 1);
+            $body = substr($message, strpos($message, ';') + 2);
+            $probe = strtok($body, ';');
+
+            $this->assertStringContainsString(
+                $probe,
+                $rows[$index][5],
+                sprintf('row %d does not hold the %dth stored audit trail', $index, $index)
             );
         }
     }
