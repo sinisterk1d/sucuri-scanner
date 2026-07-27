@@ -46,6 +46,114 @@ if (!defined('SUCURISCAN_INIT') || SUCURISCAN_INIT !== true) {
 class SucuriScanEvent extends SucuriScan
 {
     /**
+     * Check whether a field name commonly contains credentials.
+     *
+     * @param mixed $key Field or option name.
+     * @return bool Whether values for this key must not be logged.
+     */
+    public static function isSensitiveKey($key)
+    {
+        return (bool) (
+            is_string($key)
+            && preg_match(
+                '/password|passwd|(?:^|[_-])pass(?:$|[_-])|pwd|(?:^|[_-])pw(?:$|[_-])'
+                . '|secret|token|api[_-]?key|access[_-]?key|private[_-]?key'
+                . '|client[_-]?secret|authorization|cookie|salt/i',
+                $key
+            )
+        );
+    }
+
+    /**
+     * Redact common credential fields from audit trail text.
+     *
+     * @param mixed $value Audit message or detail value.
+     * @return mixed Redacted value with the original shape.
+     */
+    public static function redactSensitiveData($value)
+    {
+        if (is_array($value)) {
+            foreach ($value as $key => $item) {
+                $value[$key] = self::isSensitiveKey($key)
+                    ? '[redacted]'
+                    : self::redactSensitiveData($item);
+            }
+
+            return $value;
+        }
+
+        if (!is_string($value)) {
+            return $value;
+        }
+
+        /**
+         * Credentials reach this method in several encodings: raw, backslash
+         * escaped inside JSON, and HTML-escaped by the callers that run values
+         * through SucuriScan::escape() before building a message. Matching is
+         * therefore done against a decoded copy, but the decoded copy is only
+         * returned when it actually contained something to redact -- otherwise
+         * an innocuous "R&amp;D" would be rewritten to "R&D" and every message
+         * escaped upstream would be silently un-escaped on its way to storage.
+         */
+        $decoded = html_entity_decode(
+            str_replace(array('\\"', "\\'"), array('"', "'"), $value),
+            ENT_QUOTES,
+            'UTF-8'
+        );
+
+        /**
+         * The optional prefixes are length-bounded on purpose. Unbounded
+         * "[a-z0-9_-]*" segments in front of an alternation backtrack
+         * catastrophically on long runs of those same characters (a file-change
+         * event listing many long paths is enough), and preg_replace then
+         * returns null with PREG_BACKTRACK_LIMIT_ERROR.
+         */
+        $keys = 'password|passwd|(?:[a-z0-9_-]{0,32}[_-])?pass|pwd'
+            . '|(?:[a-z0-9_-]{0,32}[_-])?pw|secret|token|api[_-]?key'
+            . '|access[_-]?key|private[_-]?key|client[_-]?secret|authorization'
+            . '|cookie|salt';
+        $field = '(?:[a-z0-9_-]{0,32}[_-])?(?:' . $keys . ')';
+        $quoted = '/((?:^|[,{;\s])["\']?' . $field . '["\']?\s*[:=]\s*)(["\'])(.*?)\2/i';
+        $plain = '/((?:^|[;,&?\s{])["\']?' . $field . '["\']?\s*[:=]\s*)(?!["\'])([^;&}\r\n]*)/i';
+
+        /**
+         * Each result is checked before it is reused as the next subject: PHP
+         * coerces a null subject to an empty string, so chaining the calls
+         * without a guard turns a single failed match into a wiped audit entry.
+         */
+        $redacted = preg_replace($quoted, '$1$2[redacted]$2', $decoded);
+
+        if ($redacted === null) {
+            /* nothing has been masked yet, so the original is still safe */
+            return $value;
+        }
+
+        $plain_redacted = preg_replace($plain, '$1[redacted]', $redacted);
+
+        /**
+         * A failed second pass must not throw away what the first one masked.
+         * Returning the original here would put a credential that the quoted
+         * pattern had already replaced back into the audit trail: the failure
+         * mode of a redaction routine must never be "emit the secret".
+         */
+        $redacted = ($plain_redacted === null) ? $redacted : $plain_redacted;
+
+        if ($redacted === $decoded) {
+            /* nothing sensitive matched; keep the value exactly as received */
+            return $value;
+        }
+
+        /**
+         * Matching runs against an entity-decoded copy, so returning it can
+         * turn markup the caller had escaped back into live tags. Stripping
+         * here rather than at each call site also covers parseAuditLogs(),
+         * which redacts again at display and export time -- including records
+         * written by plugin versions that predate this redaction.
+         */
+        return wp_strip_all_tags($redacted);
+    }
+
+    /**
      * Creates a cronjob to run the file system scanner.
      *
      * Right after a fresh installation of the plugin, it will create a cronjob
@@ -329,6 +437,13 @@ class SucuriScanEvent extends SucuriScan
      */
     public static function sendLogToQueue($message = '')
     {
+        /**
+         * Backstop, not a duplicate of the redaction reportEvent() already ran:
+         * stripping tags there can reveal a key name that was previously broken
+         * up by markup, and this is the last point before the value is written.
+         */
+        $message = self::redactSensitiveData($message);
+
         /* create storage directory if necessary */
         SucuriScanInterface::createStorageFolder();
 
@@ -496,8 +611,13 @@ class SucuriScanEvent extends SucuriScan
             $severity_name = $severities[$severity];
         }
 
-        /* remove unnecessary characters */
-        $message = wp_strip_all_tags($message);
+        /**
+         * Stripping first stops markup from splitting a key name apart, which
+         * would hide it from the pattern ("<b>pass</b>word: secret").
+         * redactSensitiveData() strips again on its way out, because it matches
+         * against an entity-decoded copy.
+         */
+        $message = self::redactSensitiveData(wp_strip_all_tags($message));
         $message = str_replace("\r", '', $message);
         $message = str_replace("\n", '', $message);
         $message = str_replace("\t", '', $message);

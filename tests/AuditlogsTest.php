@@ -168,6 +168,9 @@ final class AuditlogsTest extends TestCase
 
     public function testRedactsLegacyPasswordsBeforeFilteringOrExport()
     {
+        /* records predating the redaction are masked when they are read back */
+        Functions\when('wp_strip_all_tags')->alias('sucuriscan_test_strip_all_tags');
+
         $auditlogs = SucuriScanAPI::filterAuditLogs(array(
             'output' => array(
                 '2026-07-15 10:30:00 admin@example.com : Error: admin, 192.0.2.1; User authentication failed: admin; password: secret',
@@ -176,8 +179,9 @@ final class AuditlogsTest extends TestCase
         ));
 
         $this->assertCount(1, $auditlogs['output_data']);
+        $this->assertStringNotContainsString('secret', $auditlogs['output_data'][0]['message']);
         $this->assertSame(
-            'User authentication failed: admin',
+            'User authentication failed: admin; password: [redacted]',
             $auditlogs['output_data'][0]['message']
         );
     }

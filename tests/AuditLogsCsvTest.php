@@ -9,12 +9,22 @@ final class AuditLogsCsvTest extends TestCase
 {
     use MockeryPHPUnitIntegration;
 
+    /** @var string */
+    private $queuePath;
+
+    /** @var string */
+    private $queueBackup;
+
     protected function setUp(): void
     {
         parent::setUp();
         Monkey\setUp();
 
+        $this->queuePath = SUCURI_DATA_STORAGE . '/sucuri-auditqueue.php';
+        $this->queueBackup = (string) file_get_contents($this->queuePath);
+
         Functions\when('get_home_path')->justReturn(__DIR__);
+        Functions\when('wp_strip_all_tags')->alias('sucuriscan_test_strip_all_tags');
         Functions\when('__')->returnArg();
         Functions\when('wp_cache_get')->justReturn(false);
         Functions\when('wp_cache_set')->justReturn(true);
@@ -29,8 +39,26 @@ final class AuditLogsCsvTest extends TestCase
     {
         $_GET = array();
 
+        /* the queue is a shared fixture; every append has to be rolled back */
+        file_put_contents($this->queuePath, $this->queueBackup);
+
         Monkey\tearDown();
         parent::tearDown();
+    }
+
+    /**
+     * Append one raw record to the local audit queue.
+     *
+     * @param string $message Audit message to store.
+     * @return void
+     */
+    private function storeAuditTrail(string $message): void
+    {
+        file_put_contents(
+            $this->queuePath,
+            sprintf("9999999999_0000:%s\n", json_encode($message)),
+            FILE_APPEND
+        );
     }
 
     /**
@@ -155,6 +183,20 @@ final class AuditLogsCsvTest extends TestCase
         $_GET['plugins'] = 'deleted';
 
         $this->assertSame($unfiltered, $this->rows($this->csv()));
+    }
+
+    public function testNeverExportsStoredCredentials()
+    {
+        /**
+         * The export is the one path that takes audit trails off the site, so
+         * the redaction applied when logs are read back is asserted here too.
+         */
+        $this->storeAuditTrail('Warning: admin, 1.2.3.4; Mailer saved; smtp_password: hunter2');
+
+        $csv = $this->csv();
+
+        $this->assertStringNotContainsString('hunter2', $csv);
+        $this->assertStringContainsString('smtp_password: [redacted]', $csv);
     }
 
     public function testExportsMessagesAndDetailsVerbatim()

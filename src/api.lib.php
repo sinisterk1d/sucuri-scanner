@@ -1035,13 +1035,15 @@ class SucuriScanAPI extends SucuriScanOption
 
             $log_data = self::getLogsHotfix($log_data);
 
-            if (strpos($log_data['message'], ";\x20password:") !== false) {
-                $log_data['message'] = substr(
-                    $log_data['message'],
-                    0,
-                    strpos($log_data['message'], ";\x20password:")
-                );
-            }
+            /**
+             * Redacted again on the way out, not only on the way in: records
+             * written by plugin versions that predate the redaction are still
+             * sitting in the queue, and they are displayed and exported by this
+             * same method. Redacting before the filters run also keeps a
+             * credential from being searchable.
+             */
+            $log_data['message'] = SucuriScanEvent::redactSensitiveData($log_data['message']);
+            $log_data['file_list'] = SucuriScanEvent::redactSensitiveData($log_data['file_list']);
 
             // Based on filters, evaluate if should skip.
             if (self::filterAuditLog($log_data, $filters) === false) {
