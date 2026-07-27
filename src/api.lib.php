@@ -274,8 +274,13 @@ class SucuriScanAPI extends SucuriScanOption
             return true;
         }
 
+        /**
+         * Every message below is built from a remote response and ends up in
+         * an admin notice that renders raw HTML, so it is escaped here rather
+         * than trusted to arrive clean.
+         */
         if (is_string($res) && !empty($res)) {
-            return SucuriScanInterface::error($res);
+            return SucuriScanInterface::error(esc_html($res));
         }
 
         if (!is_array($res)
@@ -306,7 +311,7 @@ class SucuriScanAPI extends SucuriScanOption
             SucuriScanOption::setRevProxy('disable', true);
             SucuriScanOption::setAddrHeader('REMOTE_ADDR', true);
 
-            return SucuriScanInterface::error($msg);
+            return SucuriScanInterface::error(esc_html($msg));
         }
 
         // Stop SSL peer verification on connection failures.
@@ -325,7 +330,7 @@ class SucuriScanAPI extends SucuriScanOption
             $msg = __('Invalid email format or the host is missing MX records.', 'sucuri-scanner');
         }
 
-        return SucuriScanInterface::error($msg);
+        return SucuriScanInterface::error(esc_html($msg));
     }
 
     /**
