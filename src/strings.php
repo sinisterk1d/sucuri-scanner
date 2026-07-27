@@ -30,6 +30,10 @@ __('Successfully sent to the API:', 'sucuri-scanner');
 __('Total request timeouts (failures):', 'sucuri-scanner');
 __('Total execution time:', 'sucuri-scanner');
 __('Send Logs', 'sucuri-scanner');
+__('Search audit trails', 'sucuri-scanner');
+__('Results are limited to the latest audit trails available.', 'sucuri-scanner');
+__('Filter', 'sucuri-scanner');
+__('Clear Filters', 'sucuri-scanner');
 
 // base.html.tpl
 __('Sucuri Security', 'sucuri-scanner');

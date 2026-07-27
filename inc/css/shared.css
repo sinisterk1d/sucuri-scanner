@@ -1662,6 +1662,10 @@ body.sucuri-security_page_sucuriscan_firewall .sucuriscan-panel {
     margin-right: 7px;
 }
 
+.filter-container input[type="search"] {
+    min-width: 220px;
+}
+
 .filter-container .button-secondary {
     margin-left: 8px;
 }

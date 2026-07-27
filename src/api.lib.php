@@ -484,6 +484,21 @@ class SucuriScanAPI extends SucuriScanOption
     }
 
     /**
+     * Apply audit-log filters to an existing API response.
+     *
+     * Keeping the raw response in the cache allows every filter and search to
+     * operate on the same set of logs instead of caching one filtered result.
+     *
+     * @param array $res     Parsed or raw API response containing output logs.
+     * @param array $filters Filters to apply to the logs.
+     * @return array|null Filtered audit-log response.
+     */
+    public static function filterAuditLogs($res, $filters = array())
+    {
+        return self::parseAuditLogs($res, $filters);
+    }
+
+    /**
      * Retrieves the available filters for the audit logs.
      *
      * @return array An associative array containing the filters for the auditlogs.
@@ -628,6 +643,36 @@ class SucuriScanAPI extends SucuriScanOption
                     'label' => __('Deactivated', 'sucuri-scanner'),
                     'value' => 'Plugin deactivated',
                 ),
+                'updated' => array(
+                    'label' => __('Updated', 'sucuri-scanner'),
+                    'value' => 'Plugin updated',
+                ),
+                'deleted' => array(
+                    'label' => __('Deleted', 'sucuri-scanner'),
+                    'value' => 'Plugin deleted',
+                ),
+            ),
+            'themes' => array(
+                'all themes' => array(
+                    'label' => __('All Themes', 'sucuri-scanner'),
+                    'value' => '',
+                ),
+                'installed' => array(
+                    'label' => __('Installed', 'sucuri-scanner'),
+                    'value' => 'Theme installed',
+                ),
+                'activated' => array(
+                    'label' => __('Activated', 'sucuri-scanner'),
+                    'value' => 'Theme activated',
+                ),
+                'updated' => array(
+                    'label' => __('Updated', 'sucuri-scanner'),
+                    'value' => 'Theme updated',
+                ),
+                'deleted' => array(
+                    'label' => __('Deleted', 'sucuri-scanner'),
+                    'value' => 'Theme deleted',
+                ),
             ),
             'files' => array(
                 'all files' => array(
@@ -637,6 +682,36 @@ class SucuriScanAPI extends SucuriScanOption
                 'added' => array(
                     'label' => __('Added', 'sucuri-scanner'),
                     'value' => 'Media file added',
+                ),
+            ),
+            'events' => array(
+                'all events' => array(
+                    'label' => __('All Severities', 'sucuri-scanner'),
+                    'value' => '',
+                ),
+                'critical' => array(
+                    'label' => __('Critical', 'sucuri-scanner'),
+                    'value' => 'critical',
+                ),
+                'error' => array(
+                    'label' => __('Error', 'sucuri-scanner'),
+                    'value' => 'error',
+                ),
+                'warning' => array(
+                    'label' => __('Warning', 'sucuri-scanner'),
+                    'value' => 'warning',
+                ),
+                'notice' => array(
+                    'label' => __('Notice', 'sucuri-scanner'),
+                    'value' => 'notice',
+                ),
+                'info' => array(
+                    'label' => __('Info', 'sucuri-scanner'),
+                    'value' => 'info',
+                ),
+                'debug' => array(
+                    'label' => __('Debug', 'sucuri-scanner'),
+                    'value' => 'debug',
                 ),
             ),
         );
@@ -663,31 +738,62 @@ class SucuriScanAPI extends SucuriScanOption
             }
         }
 
+        if (isset($frontend_filters['search']) && $frontend_filters['search'] !== '') {
+            $searchable = array(
+                $log['event'],
+                $log['datetime'],
+                $log['account'],
+                $log['username'],
+                $log['remote_addr'],
+                $log['message'],
+                implode("\x20", (array) $log['file_list']),
+            );
+
+            if (stripos(implode("\x20", $searchable), $frontend_filters['search']) === false) {
+                return false;
+            }
+        }
+
+        if (isset($frontend_filters['events'])) {
+            $event_filter = $frontend_filters['events'];
+
+            if (!isset($filters['events'][$event_filter])
+                || $log['event'] !== $filters['events'][$event_filter]['value']
+            ) {
+                return false;
+            }
+        }
+
         $other_filters = $frontend_filters;
-        unset($other_filters['time'], $other_filters['startDate'], $other_filters['endDate']);
+        unset(
+            $other_filters['time'],
+            $other_filters['startDate'],
+            $other_filters['endDate'],
+            $other_filters['search'],
+            $other_filters['events']
+        );
 
         if (empty($other_filters)) {
             return true;
         }
 
-        // Check if the log matches any of the other filters
+        // Activity categories use OR semantics so users can combine event types.
         foreach ($other_filters as $active_filter => $value_filter) {
             if (isset($filters[$active_filter][$value_filter])) {
                 $search_term = $filters[$active_filter][$value_filter]['value'];
 
-                $match = false;
-
                 if (is_array($search_term)) {
                     foreach ($search_term as $term) {
                         if (strpos($log['message'], $term) !== false) {
-                            $match = true;
+                            return true;
                         }
                     }
-
-                    return $match;
                 }
 
-                if (strpos($log['message'], $search_term) !== false) {
+                if (is_string($search_term)
+                    && $search_term !== ''
+                    && strpos($log['message'], $search_term) !== false
+                ) {
                     return true;
                 }
             }
@@ -913,6 +1019,14 @@ class SucuriScanAPI extends SucuriScanOption
             }
 
             $log_data = self::getLogsHotfix($log_data);
+
+            if (strpos($log_data['message'], ";\x20password:") !== false) {
+                $log_data['message'] = substr(
+                    $log_data['message'],
+                    0,
+                    strpos($log_data['message'], ";\x20password:")
+                );
+            }
 
             // Based on filters, evaluate if should skip.
             if (self::filterAuditLog($log_data, $filters) === false) {

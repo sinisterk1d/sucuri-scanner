@@ -72,8 +72,11 @@ class SucuriScanAuditLogs
 
             if ($filter === 'startDate' || $filter === 'endDate') {
                 $date = isset($frontend_filter[$filter]) ? $frontend_filter[$filter] : '';
+                $label = ($filter === 'startDate')
+                    ? __('Start Date', 'sucuri-scanner')
+                    : __('End Date', 'sucuri-scanner');
 
-                $filters_snippet .= '<input type="date" id="' . esc_attr($filter) . '" name="' . esc_attr($filter . 'Filter') . '" value="' . esc_attr($date) . '">';
+                $filters_snippet .= '<input type="date" id="' . esc_attr($filter) . '" name="' . esc_attr($filter . 'Filter') . '" value="' . esc_attr($date) . '" aria-label="' . esc_attr($label) . '" title="' . esc_attr($label) . '">';
                 continue;
             }
 
@@ -87,6 +90,7 @@ class SucuriScanAuditLogs
 
             $option_data = array(
                 'AuditLog.FilterName' => esc_attr($filter),
+                'AuditLog.FilterLabel' => esc_attr(ucwords($filter)),
                 'AuditLog.FilterOptions' => $filter_options,
             );
 
@@ -95,9 +99,131 @@ class SucuriScanAuditLogs
 
         $filters_data = array(
             'AuditLog.Filters' => $filters_snippet,
+            'AuditLog.Search' => isset($frontend_filter['search']) ? esc_attr($frontend_filter['search']) : '',
         );
 
         return SucuriScanTemplate::getSnippet('auditlogs-filters', $filters_data);
+    }
+
+    /**
+     * Get and validate filters supplied by the audit-log interface.
+     *
+     * @return array Valid audit-log filters.
+     */
+    private static function getRequestFilters()
+    {
+        $filters = array();
+        $available = SucuriScanAPI::getFilters();
+
+        foreach (array('time', 'posts', 'logins', 'users', 'plugins', 'themes', 'files', 'events') as $key) {
+            $value = SucuriScanRequest::get($key);
+
+            if ($value
+                && strpos($value, 'all ') !== 0
+                && isset($available[$key][$value])
+            ) {
+                $filters[$key] = $value;
+            }
+        }
+
+        if (isset($filters['time']) && $filters['time'] === 'custom') {
+            $start_date = SucuriScanRequest::get('startDate', '[0-9]{4}-[0-9]{2}-[0-9]{2}');
+            $end_date = SucuriScanRequest::get('endDate', '[0-9]{4}-[0-9]{2}-[0-9]{2}');
+
+            if ($start_date
+                && $end_date
+                && strtotime($start_date) !== false
+                && strtotime($end_date) !== false
+                && strtotime($start_date) <= strtotime($end_date)
+            ) {
+                $filters['startDate'] = $start_date;
+                $filters['endDate'] = $end_date;
+            } else {
+                unset($filters['time']);
+            }
+        }
+
+        $search = SucuriScanRequest::get('search');
+
+        if ($search) {
+            $search = trim(html_entity_decode($search, ENT_QUOTES, 'UTF-8'));
+
+            if ($search !== '') {
+                $filters['search'] = substr($search, 0, 200);
+            }
+        }
+
+        return $filters;
+    }
+
+    /**
+     * Retrieve the latest remote logs and local queue, then apply filters once.
+     *
+     * @param array $filters Filters to apply.
+     * @return array Audit-log result and request metadata.
+     */
+    private static function getAuditLogData($filters)
+    {
+        $result = array(
+            'auditlogs' => false,
+            'errors' => '',
+            'limited' => false,
+            'queueSize' => 0,
+            'status' => '',
+        );
+        $logs_limit = SUCURISCAN_AUDITLOGS_PER_PAGE * SUCURISCAN_MAX_PAGINATION_BUTTONS;
+        $cache = new SucuriScanCache('auditlogs');
+        $auditlogs = $cache->get('response_full', SUCURISCAN_AUDITLOGS_LIFETIME, 'array');
+
+        if (!$auditlogs) {
+            ob_start();
+            $start = microtime(true);
+            $auditlogs = SucuriScanAPI::getAuditLogs($logs_limit);
+            $result['errors'] = ob_get_contents();
+            $duration = microtime(true) - $start;
+            ob_end_clean();
+
+            if (!is_array($auditlogs)) {
+                $result['status'] = __('API is not available; using local queue', 'sucuri-scanner');
+            } else {
+                /* translators: %s: number of seconds */
+                $result['status'] = sprintf(__('API %s secs', 'sucuri-scanner'), round($duration, 4));
+            }
+
+            if ($auditlogs && empty($result['errors'])) {
+                $cache->add('response_full', $auditlogs);
+            }
+        }
+
+        if (is_array($auditlogs)
+            && isset($auditlogs['total_entries'], $auditlogs['output'])
+            && $auditlogs['total_entries'] > count((array) $auditlogs['output'])
+        ) {
+            $result['limited'] = true;
+        }
+
+        $queuelogs = SucuriScanAPI::getAuditLogsFromQueue();
+
+        if (is_array($queuelogs) && !empty($queuelogs['output'])) {
+            $result['queueSize'] = (int) $queuelogs['total_entries'];
+
+            if (!$auditlogs || empty($auditlogs['output'])) {
+                $auditlogs = $queuelogs;
+            } else {
+                $auditlogs['output'] = array_merge(
+                    $queuelogs['output'],
+                    (array) $auditlogs['output']
+                );
+            }
+        }
+
+        if (is_array($auditlogs)) {
+            $auditlogs = SucuriScanAPI::filterAuditLogs($auditlogs, $filters);
+        }
+
+        $result['auditlogs'] = $auditlogs;
+
+        return $result;
     }
 
     /**
@@ -106,8 +232,8 @@ class SucuriScanAuditLogs
      * To reduce the amount of queries to the API this method will cache the logs
      * for a short period of time enough to give the service a rest. Once the
      * cache expires the method will communicate with the API once again to get
-     * a fresh copy of the new logs. The cache is skipped when the user clicks
-     * around the pagination.
+     * a fresh copy of the new logs. Filters and pagination are applied to the
+     * same cached raw response.
      *
      * Additionally, if the API key has not been added but the website owner has
      * enabled the security log exporter, the method will retrieve the logs from
@@ -142,27 +268,7 @@ class SucuriScanAuditLogs
         /* initialize the values for the pagination */
         $maxPerPage = SUCURISCAN_AUDITLOGS_PER_PAGE;
         $pageNumber = SucuriScanTemplate::pageNumber();
-        $logsLimit = ($pageNumber * $maxPerPage);
-
-        /* Initialize filter values */
-        $filters = array();
-
-        if (SucuriScanRequest::get('time')) {
-            $filters['time'] = SucuriScanRequest::get('time');
-
-            if ($filters['time'] === 'custom') {
-                $filters['startDate'] = SucuriScanRequest::get('startDate');
-                $filters['endDate'] = SucuriScanRequest::get('endDate');
-            }
-        }
-
-        $filter_keys = array('posts', 'logins', 'users', 'plugins', 'files');
-
-        foreach ($filter_keys as $key) {
-            if (SucuriScanRequest::get($key)) {
-                $filters[$key] = SucuriScanRequest::get($key);
-            }
-        }
+        $filters = self::getRequestFilters();
 
         if (!empty($filters)) {
             $response['filtersStatus'] = 'active';
@@ -170,65 +276,12 @@ class SucuriScanAuditLogs
 
         $response['filters'] = self::getFiltersSnippet($filters);
 
-        /* Get data from the cache if possible. */
-        $errors = ''; /* no errors so far */
-        $cache = new SucuriScanCache('auditlogs');
-        $auditlogs = $cache->get('response', SUCURISCAN_AUDITLOGS_LIFETIME, 'array');
-        $cacheTheResponse = false; /* cache if the data comes from the API */
-
-        /* API call if cache is invalid. */
-        if (!$auditlogs || $pageNumber !== 1) {
-            ob_start();
-            $start = microtime(true);
-            $cacheTheResponse = true;
-            $auditlogs = SucuriScanAPI::getAuditLogs($logsLimit, $filters);
-            $errors = ob_get_contents(); /* capture errors */
-            $duration = microtime(true) - $start;
-            ob_end_clean();
-
-            /* report latency in the API calls */
-            if (!is_array($auditlogs)) {
-                $response['status'] = __('API is not available; using local queue', 'sucuri-scanner');
-            } else {
-                /* translators: %s: number of seconds */
-                $response['status'] = sprintf(__('API %s secs', 'sucuri-scanner'), round($duration, 4));
-            }
-        }
-
-        /* stop everything and report errors */
-        if (!empty($errors)) {
-            $response['content'] .= $errors;
-        }
-
-        /* Cache the data for some time. */
-        if ($cacheTheResponse && $auditlogs && empty($errors)) {
-            $cache->add('response', $auditlogs);
-        }
-
-        /* merge the logs from the queue system */
-        $queuelogs = SucuriScanAPI::getAuditLogsFromQueue($filters);
-
-        if (is_array($queuelogs) && !empty($queuelogs)) {
-            if (!$auditlogs || empty($auditlogs)) {
-                $auditlogs = $queuelogs;
-            } else {
-                $auditlogs['output'] = array_merge(
-                    $queuelogs['output'],
-                    @$auditlogs['output']
-                );
-
-                $auditlogs['output_data'] = array_merge(
-                    $queuelogs['output_data'],
-                    @$auditlogs['output_data']
-                );
-
-                if (isset($auditlogs['total_entries'])) {
-                    $auditlogs['total_entries'] = $auditlogs['total_entries'] + $queuelogs['total_entries'];
-                } else {
-                    $auditlogs['total_entries'] = $queuelogs['total_entries'];
-                }
-            }
-        }
+        $data = self::getAuditLogData($filters);
+        $auditlogs = $data['auditlogs'];
+        $response['content'] .= $data['errors'];
+        $response['limited'] = $data['limited'];
+        $response['queueSize'] = $data['queueSize'];
+        $response['status'] = $data['status'];
 
         if (!is_array($auditlogs)
             || !isset($auditlogs['output_data'])
@@ -252,7 +305,7 @@ class SucuriScanAuditLogs
         usort($outdata, array('SucuriScanAuditLogs', 'sortByDate'));
 
         for ($i = $iterator_start; $i < $total_items; $i++) {
-            if ($counter_i > $maxPerPage) {
+            if ($counter_i >= $maxPerPage) {
                 break;
             }
 
@@ -261,11 +314,6 @@ class SucuriScanAuditLogs
             }
 
             $audit_log = (array)$outdata[$i];
-
-            if (strpos($audit_log['message'], ";\x20password:")) {
-                $idx = strpos($audit_log['message'], ";\x20password:");
-                $audit_log['message'] = substr($audit_log['message'], 0, $idx);
-            }
 
             $snippet_data = array(
                 'AuditLog.Event' => $audit_log['event'],
@@ -319,8 +367,6 @@ class SucuriScanAuditLogs
                 );
             }
         }
-
-        $response['queueSize'] = $auditlogs['total_entries'];
 
         wp_send_json($response, 200);
     }
