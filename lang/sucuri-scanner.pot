@@ -9,7 +9,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-07-27T21:30:05+00:00\n"
+"POT-Creation-Date: 2026-07-27T23:27:12+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: sucuri-scanner\n"
@@ -82,7 +82,7 @@ msgid "All Time"
 msgstr ""
 
 #: src/api.lib.php:534
-#: src/auditlogs.lib.php:654
+#: src/auditlogs.lib.php:673
 msgid "Today"
 msgstr ""
 
@@ -307,52 +307,52 @@ msgid "Automatic update of security keys failed. Something went wrong!"
 msgstr ""
 
 #. translators: %1$s: display name, %2$d: time interval
-#: src/event.lib.php:234
+#: src/event.lib.php:242
 #, php-format
 msgid "%1$s (every %2$d seconds)"
 msgstr ""
 
-#: src/event.lib.php:240
+#: src/event.lib.php:248
 msgid "Never (no execution)"
 msgstr ""
 
-#: src/event.lib.php:292
+#: src/event.lib.php:300
 msgid "Weekly"
 msgstr ""
 
-#: src/event.lib.php:298
+#: src/event.lib.php:306
 msgid "Monthly"
 msgstr ""
 
-#: src/event.lib.php:304
+#: src/event.lib.php:312
 msgid "Quarterly"
 msgstr ""
 
-#: src/event.lib.php:359
-#: src/event.lib.php:410
+#: src/event.lib.php:367
+#: src/event.lib.php:418
 msgid "API key is not available"
 msgstr ""
 
-#: src/event.lib.php:367
+#: src/event.lib.php:375
 msgid "WordPress version was already reported"
 msgstr ""
 
 #. translators: %s: WordPress version
-#: src/event.lib.php:371
+#: src/event.lib.php:379
 #, php-format
 msgid "WordPress version detected %s"
 msgstr ""
 
-#: src/event.lib.php:414
+#: src/event.lib.php:422
 msgid "Scanner ran a couple of minutes ago"
 msgstr ""
 
-#: src/event.lib.php:446
+#: src/event.lib.php:454
 msgid "Event identifier cannot be empty"
 msgstr ""
 
 #. translators: %1$s: settings url, %2$s: settings url
-#: src/event.lib.php:784
+#: src/event.lib.php:792
 #, php-format
 msgid ""
 "<br><br>\n"
@@ -365,24 +365,24 @@ msgid ""
 ""
 msgstr ""
 
-#: src/event.lib.php:933
+#: src/event.lib.php:941
 msgid "Password Change"
 msgstr ""
 
 #. translators: %s: file path
-#: src/event.lib.php:1109
+#: src/event.lib.php:1117
 #, php-format
 msgid "%s cannot be deleted."
 msgstr ""
 
 #. translators: %s: comma-separated list of filenames
-#: src/event.lib.php:1121
+#: src/event.lib.php:1129
 #, php-format
 msgid "%s log files were deleted."
 msgstr ""
 
 #. translators: %s: filename
-#: src/event.lib.php:1123
+#: src/event.lib.php:1131
 #, php-format
 msgid "%s log file was deleted."
 msgstr ""
