@@ -9,7 +9,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-07-27T19:41:45+00:00\n"
+"POT-Creation-Date: 2026-07-27T21:11:51+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: sucuri-scanner\n"
@@ -82,7 +82,7 @@ msgid "All Time"
 msgstr ""
 
 #: src/api.lib.php:534
-#: src/auditlogs.lib.php:595
+#: src/auditlogs.lib.php:619
 msgid "Today"
 msgstr ""
 
@@ -245,37 +245,37 @@ msgstr ""
 msgid "WordPress version is not supported anymore"
 msgstr ""
 
-#: src/auditlogs.lib.php:89
+#: src/auditlogs.lib.php:94
 msgid "Start Date"
 msgstr ""
 
-#: src/auditlogs.lib.php:90
+#: src/auditlogs.lib.php:95
 msgid "End Date"
 msgstr ""
 
-#: src/auditlogs.lib.php:200
+#: src/auditlogs.lib.php:205
 msgid "API is not available; using local queue"
 msgstr ""
 
 #. translators: %s: number of seconds
-#: src/auditlogs.lib.php:203
+#: src/auditlogs.lib.php:208
 #, php-format
 msgid "API %s secs"
 msgstr ""
 
-#: src/auditlogs.lib.php:306
+#: src/auditlogs.lib.php:311
 msgid "There are no logs."
 msgstr ""
 
-#: src/auditlogs.lib.php:357
+#: src/auditlogs.lib.php:362
 msgid "status has been changed"
 msgstr ""
 
-#: src/auditlogs.lib.php:405
+#: src/auditlogs.lib.php:410
 msgid "The audit trail download link is invalid or expired."
 msgstr ""
 
-#: src/auditlogs.lib.php:406
+#: src/auditlogs.lib.php:411
 msgid "Audit trail export"
 msgstr ""
 
@@ -307,52 +307,52 @@ msgid "Automatic update of security keys failed. Something went wrong!"
 msgstr ""
 
 #. translators: %1$s: display name, %2$d: time interval
-#: src/event.lib.php:198
+#: src/event.lib.php:234
 #, php-format
 msgid "%1$s (every %2$d seconds)"
 msgstr ""
 
-#: src/event.lib.php:204
+#: src/event.lib.php:240
 msgid "Never (no execution)"
 msgstr ""
 
-#: src/event.lib.php:256
+#: src/event.lib.php:292
 msgid "Weekly"
 msgstr ""
 
-#: src/event.lib.php:262
+#: src/event.lib.php:298
 msgid "Monthly"
 msgstr ""
 
-#: src/event.lib.php:268
+#: src/event.lib.php:304
 msgid "Quarterly"
 msgstr ""
 
-#: src/event.lib.php:323
-#: src/event.lib.php:374
+#: src/event.lib.php:359
+#: src/event.lib.php:410
 msgid "API key is not available"
 msgstr ""
 
-#: src/event.lib.php:331
+#: src/event.lib.php:367
 msgid "WordPress version was already reported"
 msgstr ""
 
 #. translators: %s: WordPress version
-#: src/event.lib.php:335
+#: src/event.lib.php:371
 #, php-format
 msgid "WordPress version detected %s"
 msgstr ""
 
-#: src/event.lib.php:378
+#: src/event.lib.php:414
 msgid "Scanner ran a couple of minutes ago"
 msgstr ""
 
-#: src/event.lib.php:410
+#: src/event.lib.php:446
 msgid "Event identifier cannot be empty"
 msgstr ""
 
 #. translators: %1$s: settings url, %2$s: settings url
-#: src/event.lib.php:743
+#: src/event.lib.php:784
 #, php-format
 msgid ""
 "<br><br>\n"
@@ -365,24 +365,24 @@ msgid ""
 ""
 msgstr ""
 
-#: src/event.lib.php:892
+#: src/event.lib.php:933
 msgid "Password Change"
 msgstr ""
 
 #. translators: %s: file path
-#: src/event.lib.php:1068
+#: src/event.lib.php:1109
 #, php-format
 msgid "%s cannot be deleted."
 msgstr ""
 
 #. translators: %s: comma-separated list of filenames
-#: src/event.lib.php:1080
+#: src/event.lib.php:1121
 #, php-format
 msgid "%s log files were deleted."
 msgstr ""
 
 #. translators: %s: filename
-#: src/event.lib.php:1082
+#: src/event.lib.php:1123
 #, php-format
 msgid "%s log file was deleted."
 msgstr ""
