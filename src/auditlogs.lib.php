@@ -51,6 +51,11 @@ class SucuriScanAuditLogs
          * The export is a plain link, so the nonce travels in the href. The
          * template renders this through the escaped "%%...%%" tag, which turns
          * the query separators into "&amp;" as an HTML attribute requires.
+         *
+         * admin_url() on purpose, rather than the SucuriScan::adminURL() helper
+         * the rest of the plugin uses: that helper switches to
+         * network_admin_url() on multisite, and WordPress ships no
+         * wp-admin/network/admin-post.php for the link to point at.
          */
         $params['AuditLogs.DownloadURL'] = add_query_arg(
             array(
@@ -408,15 +413,24 @@ class SucuriScanAuditLogs
             );
         }
 
+        /**
+         * Built before a single header goes out. Reading the queue is the
+         * expensive part of the export, and a failure there once the download
+         * headers were already on the wire reached the browser as a complete
+         * but silently truncated CSV; now it surfaces as an ordinary error page
+         * and no file is saved.
+         */
+        $csv = self::getAuditLogsCsv();
         $filename = 'sucuri-audit-trails-' . SucuriScan::datetime(null, 'Y-m-d') . '.csv';
 
         nocache_headers();
         header('Content-Type: text/csv; charset=utf-8');
         header('Content-Disposition: attachment; filename="' . $filename . '"');
         header('X-Content-Type-Options: nosniff');
+        header('Content-Length: ' . strlen($csv));
 
         // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
-        echo self::getAuditLogsCsv();
+        echo $csv;
 
         exit(0);
     }
@@ -440,6 +454,13 @@ class SucuriScanAuditLogs
      * block is already discarded by SucuriScanCache while it parses the
      * datastore, so only real records reach the export.
      *
+     * The whole queue is held in memory while the CSV is assembled, which is
+     * what reusing the audit page's parser buys in simplicity. Peak usage runs
+     * to roughly twenty times the size of the queue file, so the practical
+     * ceiling is a queue of a few megabytes against the 256M that WordPress
+     * raises the admin memory limit to. Past that the export fails, visibly,
+     * before any download headers are sent.
+     *
      * @return string CSV content.
      */
     private static function getAuditLogsCsv()
@@ -448,6 +469,9 @@ class SucuriScanAuditLogs
         $logs = (is_array($auditlogs) && isset($auditlogs['output_data']))
             ? (array) $auditlogs['output_data']
             : array();
+
+        /* the raw log strings are a second full copy of the queue */
+        unset($auditlogs);
 
         usort($logs, array('SucuriScanAuditLogs', 'sortByDate'));
 

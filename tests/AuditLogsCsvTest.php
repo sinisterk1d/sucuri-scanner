@@ -104,24 +104,62 @@ final class AuditLogsCsvTest extends TestCase
     }
 
     /**
-     * Number of audit trails held in the local queue fixture.
+     * Audit trails held in the local queue fixture, read straight from disk.
      *
-     * @return int Stored audit trail count.
+     * Deliberately not routed through SucuriScanAPI::getAuditLogsFromQueue():
+     * an expectation taken from the same call the export makes could not
+     * detect a fault in that call.
+     *
+     * @return array Stored messages, keyed by datastore key.
      */
-    private function storedAuditTrailCount(): int
+    private function storedAuditTrails(): array
     {
-        $auditlogs = SucuriScanAPI::getAuditLogsFromQueue();
+        $records = array();
 
-        return count((array) $auditlogs['output_data']);
+        foreach (file($this->queuePath) as $line) {
+            if (!preg_match('/^([0-9]+_[0-9]+):(.*)$/', trim($line), $parts)) {
+                continue; /* header line, not a record */
+            }
+
+            $message = json_decode($parts[2], true);
+
+            if (is_string($message)) {
+                /* duplicate keys collapse in the datastore, as they do on read */
+                $records[$parts[1]] = $message;
+            }
+        }
+
+        return $records;
     }
 
     public function testExportsEveryStoredAuditTrail()
     {
+        $csv = $this->csv();
+
+        foreach ($this->storedAuditTrails() as $key => $message) {
+            /* "Severity: user, ip; " is split into its own columns */
+            $body = substr($message, strpos($message, ';') + 2);
+
+            /**
+             * A "... has been changed" entry is reshaped on read: the detail
+             * list moves into its own column, so compare on the part before it.
+             */
+            $probe = strtok($body, ';');
+
+            $this->assertStringContainsString(
+                $probe,
+                $csv,
+                sprintf('audit trail %s is missing from the export', $key)
+            );
+        }
+    }
+
+    public function testExportsOneRowPerStoredAuditTrail()
+    {
         $rows = $this->rows($this->csv());
 
-        /* one header row plus every audit trail in the local queue */
-        $this->assertCount($this->storedAuditTrailCount() + 1, $rows);
         $this->assertGreaterThan(1, count($rows));
+        $this->assertCount(count($this->storedAuditTrails()) + 1, $rows);
     }
 
     public function testNeverLeaksTheDatastorePhpHeader()
