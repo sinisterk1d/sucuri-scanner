@@ -86,21 +86,60 @@ class SucuriScanEvent extends SucuriScan
             return $value;
         }
 
+        $redacted = self::maskCredentialFields($value);
+
         /**
-         * Credentials reach this method in several encodings: raw, backslash
-         * escaped inside JSON, and HTML-escaped by the callers that run values
-         * through SucuriScan::escape() before building a message. Matching is
-         * therefore done against a decoded copy, but the decoded copy is only
-         * returned when it actually contained something to redact -- otherwise
-         * an innocuous "R&amp;D" would be rewritten to "R&D" and every message
-         * escaped upstream would be silently un-escaped on its way to storage.
+         * Credentials also arrive encoded: backslash escaped inside JSON, or
+         * HTML escaped by the callers that build messages out of values passed
+         * through SucuriScan::escape(). A second pass over a decoded copy
+         * catches those, but its result is only used when it actually found
+         * something the first pass missed -- otherwise every message would be
+         * silently un-escaped, and an innocuous "R&amp;D" rewritten to "R&D",
+         * on its way to storage.
          */
         $decoded = html_entity_decode(
             str_replace(array('\\"', "\\'"), array('"', "'"), $value),
             ENT_QUOTES,
             'UTF-8'
         );
+        $decoded_redacted = self::maskCredentialFields($decoded);
 
+        if (self::decodeForMatching($redacted) === $decoded_redacted) {
+            return $redacted;
+        }
+
+        /**
+         * The encoding was hiding a credential, so the decoded copy is the only
+         * safe thing to emit. Escape it on the way out: decoding can turn
+         * stored entities back into live markup, and this value is rendered on
+         * the audit trail page.
+         */
+        return esc_attr($decoded_redacted);
+    }
+
+    /**
+     * Decode the escapings a credential can hide behind.
+     *
+     * @param string $value Audit message or detail value.
+     * @return string Decoded copy, used only for matching.
+     */
+    private static function decodeForMatching($value)
+    {
+        return html_entity_decode(
+            str_replace(array('\\"', "\\'"), array('"', "'"), $value),
+            ENT_QUOTES,
+            'UTF-8'
+        );
+    }
+
+    /**
+     * Replace the value of every credential-looking field in a string.
+     *
+     * @param string $value Audit message or detail value.
+     * @return string Value with credential fields masked.
+     */
+    private static function maskCredentialFields($value)
+    {
         /**
          * The optional prefixes are length-bounded on purpose. Unbounded
          * "[a-z0-9_-]*" segments in front of an alternation backtrack
@@ -113,18 +152,29 @@ class SucuriScanEvent extends SucuriScan
             . '|access[_-]?key|private[_-]?key|client[_-]?secret|authorization'
             . '|cookie|salt';
         $field = '(?:[a-z0-9_-]{0,32}[_-])?(?:' . $keys . ')';
+
+        /**
+         * An unquoted value runs to the end of the field, but a message often
+         * packs many fields together -- hookOptionsChanges() joins every option
+         * changed in one save with a comma. Without the lookahead the mask
+         * would swallow each following field as if it were part of the
+         * credential, deleting the record of everything that changed after it.
+         * A comma inside the value itself is still covered, because only a
+         * comma that introduces another "name:" pair ends the match.
+         */
+        $boundary = '(?:(?!,\s*["\']?[a-z0-9_-]{1,64}["\']?\s*[:=])[^;&}\r\n])*';
         $quoted = '/((?:^|[,{;\s])["\']?' . $field . '["\']?\s*[:=]\s*)(["\'])(.*?)\2/i';
-        $plain = '/((?:^|[;,&?\s{])["\']?' . $field . '["\']?\s*[:=]\s*)(?!["\'])([^;&}\r\n]*)/i';
+        $plain = '/((?:^|[;,&?\s{])["\']?' . $field . '["\']?\s*[:=]\s*)(?!["\'])(' . $boundary . ')/i';
 
         /**
          * Each result is checked before it is reused as the next subject: PHP
          * coerces a null subject to an empty string, so chaining the calls
          * without a guard turns a single failed match into a wiped audit entry.
          */
-        $redacted = preg_replace($quoted, '$1$2[redacted]$2', $decoded);
+        $redacted = preg_replace($quoted, '$1$2[redacted]$2', $value);
 
         if ($redacted === null) {
-            /* nothing has been masked yet, so the original is still safe */
+            /* nothing has been masked yet, so the original is still intact */
             return $value;
         }
 
@@ -136,21 +186,7 @@ class SucuriScanEvent extends SucuriScan
          * pattern had already replaced back into the audit trail: the failure
          * mode of a redaction routine must never be "emit the secret".
          */
-        $redacted = ($plain_redacted === null) ? $redacted : $plain_redacted;
-
-        if ($redacted === $decoded) {
-            /* nothing sensitive matched; keep the value exactly as received */
-            return $value;
-        }
-
-        /**
-         * Matching runs against an entity-decoded copy, so returning it can
-         * turn markup the caller had escaped back into live tags. Stripping
-         * here rather than at each call site also covers parseAuditLogs(),
-         * which redacts again at display and export time -- including records
-         * written by plugin versions that predate this redaction.
-         */
-        return wp_strip_all_tags($redacted);
+        return ($plain_redacted === null) ? $redacted : $plain_redacted;
     }
 
     /**
@@ -612,11 +648,16 @@ class SucuriScanEvent extends SucuriScan
         }
 
         /**
-         * Stripping first stops markup from splitting a key name apart, which
-         * would hide it from the pattern ("<b>pass</b>word: secret").
-         * redactSensitiveData() strips again on its way out, because it matches
-         * against an entity-decoded copy.
+         * Stripping before redacting stops markup from splitting a key name
+         * apart, which would hide it from the pattern ("<b>pass</b>word:
+         * secret").
+         *
+         * A "<" with no ">" after it is text, not an unterminated tag, and is
+         * escaped rather than handed to the stripper: strip_tags() deletes from
+         * such a bracket to the end of the string, so a site title or option
+         * value containing one silently truncated the audit entry.
          */
+        $message = preg_replace('/<(?![^<]*>)/', '&lt;', (string) $message);
         $message = self::redactSensitiveData(wp_strip_all_tags($message));
         $message = str_replace("\r", '', $message);
         $message = str_replace("\n", '', $message);

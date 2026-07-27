@@ -127,4 +127,102 @@ final class EventRedactionTest extends TestCase
         $this->assertStringContainsString($escaped, $stored);
         $this->assertStringNotContainsString('<script', $stored);
     }
+
+    public function testKeepsEveryOtherFieldChangedInTheSameSave()
+    {
+        /**
+         * hookOptionsChanges() joins every option changed in one settings save
+         * with a comma, and WordPress' own Writing page carries mailserver_pass.
+         * The mask has to stop at the field boundary: swallowing to the end of
+         * the value deleted the record of everything that changed after the
+         * credential, which is audit history that cannot be recovered.
+         */
+        $stored = $this->report(
+            "Writing settings changed: (multiple entries): "
+            . "mailserver_url: from 'mail.a.com' to 'smtp.a.com',"
+            . "mailserver_pass: from 'oldsecret' to 'newsecret',"
+            . "default_post_format: from '0' to 'aside'"
+        );
+
+        $this->assertStringNotContainsString('oldsecret', $stored);
+        $this->assertStringNotContainsString('newsecret', $stored);
+        $this->assertStringContainsString('mailserver_pass: [redacted]', $stored);
+        $this->assertStringContainsString("mailserver_url: from 'mail.a.com' to 'smtp.a.com'", $stored);
+        $this->assertStringContainsString("default_post_format: from '0' to 'aside'", $stored);
+    }
+
+    public function testKeepsValuesContainingAnAngleBracket()
+    {
+        /**
+         * strip_tags() deletes from "<" to the end of the string when nothing
+         * closes the tag, so masking used to truncate the entry at the bracket
+         * and take the credential mask that followed with it -- the record no
+         * longer showed that a password had changed at all.
+         */
+        $stored = $this->report(
+            "Global settings changed: (multiple entries): "
+            . "blogdescription: from 'a' to 'x<y',"
+            . "mailserver_pass: from 'p' to 'q'"
+        );
+
+        $this->assertStringNotContainsString("'p'", $stored);
+        $this->assertStringContainsString('mailserver_pass: [redacted]', $stored);
+
+        /* the bracket survives as text; it is escaped, never deleted */
+        $this->assertStringContainsString('x&lt;y', $stored);
+    }
+
+    public function testKeepsAValueContainingAnAngleBracketWithoutAnyCredential()
+    {
+        /**
+         * The same truncation, on the path where nothing is redacted at all.
+         * This one predates the redaction: reportEvent() has always run the
+         * message through strip_tags().
+         */
+        $stored = $this->report("Post was updated; ID: 1; name: Tips <3 for you");
+
+        $this->assertStringContainsString('Tips &lt;3 for you', $stored);
+    }
+
+    public function testStillStripsRealMarkup()
+    {
+        $stored = $this->report('Settings saved; <b>bold</b> and <i>italic</i>');
+
+        $this->assertStringNotContainsString('<b>', $stored);
+        $this->assertStringNotContainsString('<i>', $stored);
+        $this->assertStringContainsString('bold', $stored);
+        $this->assertStringContainsString('italic', $stored);
+    }
+
+    public function testMasksACredentialHiddenBehindItsEncoding()
+    {
+        /**
+         * Called directly rather than through reportEvent(), because this is
+         * the one branch where the decoded copy is the only thing that saw the
+         * credential: backslash escaping inside a JSON payload hides the quotes
+         * the pattern keys on. The result is escaped on the way out, since
+         * decoding can turn stored entities back into live markup.
+         */
+        $redacted = SucuriScanEvent::redactSensitiveData(
+            '{"user":"admin","password\\": \\"s3cr3t\\""}'
+        );
+
+        $this->assertStringNotContainsString('s3cr3t', $redacted);
+        $this->assertStringContainsString('[redacted]', $redacted);
+        $this->assertStringNotContainsString('"', $redacted);
+    }
+
+    public function testMasksAValueThatItselfContainsAComma()
+    {
+        /**
+         * Only a comma that introduces another "name:" pair ends the match, so
+         * a credential containing a comma is still masked in full.
+         */
+        $stored = $this->report('Connector saved; api_key: abc,def,ghi');
+
+        $this->assertStringNotContainsString('abc', $stored);
+        $this->assertStringNotContainsString('def', $stored);
+        $this->assertStringNotContainsString('ghi', $stored);
+        $this->assertStringContainsString('api_key: [redacted]', $stored);
+    }
 }
