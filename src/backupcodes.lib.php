@@ -2,7 +2,7 @@
 /**
  * Code related to Two-Factor Authentication backup/recovery codes.
  *
- * PHP version 5
+ * PHP version 7.4
  *
  * @category   Library
  * @package    Sucuri
