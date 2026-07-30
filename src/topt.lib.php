@@ -231,7 +231,7 @@ class SucuriScanTwoFactor extends SucuriScan
 
         if ($is_profile_context) {
             if ($hook === 'profile.php') {
-                $target_user = get_current_user_id();
+                $target_user = (int) get_current_user_id();
             } elseif ($hook === 'user-edit.php') {
                 $req_user = SucuriScanRequest::get('user_id', '[0-9]+');
 
@@ -240,7 +240,7 @@ class SucuriScanTwoFactor extends SucuriScan
                 }
             }
         } else {
-            $target_user = get_current_user_id();
+            $target_user = (int) get_current_user_id();
         }
 
         if (!self::is_enforced_for_user($target_user) && !$is_plugin_twofactor_page) {
@@ -929,9 +929,13 @@ class SucuriScanTwoFactor extends SucuriScan
      */
     protected static function resolve_ajax_target_user()
     {
-        $current = get_current_user_id();
+        // Caller identity always comes from the session, never from the
+        // request; the POSTed user_id below is only ever a target. Cast so the
+        // strict comparison against the (int) target does not depend on the
+        // return type of get_current_user_id().
+        $current = (int) get_current_user_id();
 
-        if (!$current || $current <= 0) {
+        if ($current <= 0) {
             wp_send_json_error(array('message' => 'Forbidden'), 403);
         }
 
@@ -1010,17 +1014,30 @@ class SucuriScanTwoFactor extends SucuriScan
     /**
      * Build status snippet HTML (enabled state actions) for a user.
      *
+     * The backup-codes row is only included when the viewer is the account
+     * owner, because regeneration reveals the plaintext codes to whoever clicks
+     * the button. See ajax_profile_backup_regen().
+     *
      * @param int $user_id
+     * @param bool $is_self Whether the current user owns this account.
      *
      * @return string
      */
-    protected static function profile_status_snippet($user_id)
+    protected static function profile_status_snippet($user_id, $is_self = true)
     {
+        $backup_row_html = '';
+
+        if ($is_self) {
+            $backup_row_html = SucuriScanTemplate::getSnippet('profile-2fa-backup-row', array(
+                'BackupCodesRemaining' => SucuriScanBackupCodes::remaining_count($user_id),
+            ));
+        }
+
         return SucuriScanTemplate::getSnippet('profile-2fa-status', array(
             'ajax_url' => admin_url('admin-ajax.php'),
             'ajax_nonce' => wp_create_nonce('sucuri_profile_2fa_' . (int) $user_id),
             'user_id' => (int) $user_id,
-            'BackupCodesRemaining' => SucuriScanBackupCodes::remaining_count($user_id),
+            'BackupCodesRowHTML' => $backup_row_html,
         ));
     }
 
@@ -1071,9 +1088,9 @@ class SucuriScanTwoFactor extends SucuriScan
      */
     public static function render_backup_codes_reveal_notice()
     {
-        $user_id = get_current_user_id();
+        $user_id = (int) get_current_user_id();
 
-        if (!$user_id) {
+        if ($user_id <= 0) {
             return;
         }
 
@@ -1200,8 +1217,8 @@ class SucuriScanTwoFactor extends SucuriScan
             return;
         }
 
-        $current_id = get_current_user_id();
-        $is_self = ((int) $user->ID === (int) $current_id);
+        $current_id = (int) get_current_user_id();
+        $is_self = ((int) $user->ID === $current_id);
         $can_manage_users = SucuriScanPermissions::canEditUsers();
 
         if (!self::is_enforced_for_user((int) $user->ID)) {
@@ -1219,7 +1236,7 @@ class SucuriScanTwoFactor extends SucuriScan
         $uid = (int) $user->ID;
 
         if ($enabled) {
-            $actions_html = self::profile_status_snippet($uid);
+            $actions_html = self::profile_status_snippet($uid, $is_self);
         } else {
             $actions_html = '';
 
@@ -1337,6 +1354,15 @@ class SucuriScanTwoFactor extends SucuriScan
      * AJAX handler to regenerate (invalidate + replace) a user's backup codes.
      * Requires an existing Two-Factor secret (backup codes are a fallback for
      * TOTP, not a standalone method).
+     *
+     * Self-only, even for users with edit_users: this endpoint returns the
+     * plaintext codes to the caller, and a backup code is a full substitute for
+     * the TOTP second factor at login. Letting an administrator regenerate for
+     * someone else would hand them usable credentials for that account while
+     * leaving the target with no signal that anything changed (their
+     * authenticator keeps working). Administrators recovering a locked-out user
+     * should reset Two-Factor instead; re-enrollment issues a fresh set.
+     *
      * Expects POST with: user_id (int, optional), nonce (string, required).
      *
      * @return void (sends JSON response and exits)
@@ -1349,6 +1375,10 @@ class SucuriScanTwoFactor extends SucuriScan
 
         $resolved = self::resolve_ajax_target_user();
         $user_id = $resolved['target'];
+
+        if (!$resolved['is_self']) {
+            wp_send_json_error(array('message' => __('You can only regenerate backup codes for your own account.', 'sucuri-scanner')), 403);
+        }
 
         $existing_secret = self::get_user_totp_key($user_id);
 
@@ -1398,8 +1428,8 @@ class SucuriScanTwoFactor extends SucuriScan
             return;
         }
 
-        $current_id = get_current_user_id();
-        $is_self = ($current_id && (int) $current_id === $user_id);
+        $current_id = (int) get_current_user_id();
+        $is_self = ($current_id > 0 && $current_id === $user_id);
 
         if ($action === 'enable') {
             if (!$is_self) {
@@ -1474,13 +1504,13 @@ class SucuriScanTwoFactor extends SucuriScan
             return SucuriScanInterface::error(__('Incorrect nonce.', 'sucuri-scanner'));
         }
 
-        $user = wp_get_current_user();
+        $user_id = (int) get_current_user_id();
 
-        if (!$user->ID) {
+        if ($user_id <= 0) {
             return SucuriScanInterface::error(__('Incorrect user.', 'sucuri-scanner'));
         }
 
-        $existing = self::get_user_totp_key((int) $user->ID);
+        $existing = self::get_user_totp_key($user_id);
 
         if (!empty($existing)) {
             return SucuriScanTemplate::getSnippet('2fa-current-user-status', array(
@@ -1488,7 +1518,7 @@ class SucuriScanTwoFactor extends SucuriScan
             ));
         }
 
-        $data = self::generate_setup_key_and_otpauth((int) $user->ID);
+        $data = self::generate_setup_key_and_otpauth($user_id);
 
         if (empty($data)) {
             return SucuriScanInterface::error(__('Unable to generate secret.', 'sucuri-scanner'));
@@ -1514,13 +1544,13 @@ class SucuriScanTwoFactor extends SucuriScan
      */
     public static function current_user_block()
     {
-        $user = wp_get_current_user();
+        $user_id = (int) get_current_user_id();
 
-        if (!$user || !$user->ID) {
+        if ($user_id <= 0) {
             return SucuriScanInterface::error(__('Incorrect user.', 'sucuri-scanner'));
         }
 
-        $existing = self::get_user_totp_key((int) $user->ID);
+        $existing = self::get_user_totp_key($user_id);
 
         if (!empty($existing)) {
             return SucuriScanTemplate::getSnippet('2fa-current-user-status', array(
@@ -1528,7 +1558,7 @@ class SucuriScanTwoFactor extends SucuriScan
             ));
         }
 
-        $data = self::generate_setup_key_and_otpauth((int) $user->ID);
+        $data = self::generate_setup_key_and_otpauth($user_id);
 
         if (empty($data)) {
             return SucuriScanInterface::error(__('Unable to generate secret.', 'sucuri-scanner'));
@@ -2154,13 +2184,12 @@ class SucuriScanTwoFactor extends SucuriScan
             return SucuriScanInterface::error(__('Incorrect nonce.', 'sucuri-scanner'));
         }
 
-        $user = wp_get_current_user();
+        $user_id = (int) get_current_user_id();
 
-        if (!$user || !$user->ID) {
+        if ($user_id <= 0) {
             return SucuriScanInterface::error(__('Incorrect user.', 'sucuri-scanner'));
         }
 
-        $user_id = (int) $user->ID;
         $existingKey = self::get_user_totp_key($user_id);
         $code_raw = SucuriScanRequest::post('topt_code', '[0-9 ]+');
         $code = $code_raw ? preg_replace('/\D+/', '', $code_raw) : '';
