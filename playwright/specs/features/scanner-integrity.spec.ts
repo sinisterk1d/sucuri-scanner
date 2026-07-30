@@ -10,9 +10,9 @@
  * so an afterEach wipes the integrity + ignore data stores for the next test/run.
  * The cron schedule and the diff-utility option are also restored.
  *
- * Every selected test creates the scanner fixtures and clears scanner state.
- * beforeEach pins :diff_utility = enabled so the dashboard renders the
- * clickable integrity rows and the toggle test starts from a known state.
+ * beforeEach creates the scanner fixtures, clears scanner state, and pins
+ * :diff_utility = enabled so the dashboard renders the clickable integrity rows
+ * and the toggle test starts from a known state.
  */
 import { test, expect } from "../../support/fixtures";
 import type { Page, Response } from "@playwright/test";
@@ -38,8 +38,8 @@ const SCANNER_FIXTURES = [
 
 /**
  * Match the integrity-list AJAX: a POST to admin-ajax.php?page=sucuriscan
- * whose body contains "check_wordpress_integrity". Replaces the Cypress
- * cy.intercept alias + cy.wait('@integrityCheck').
+ * whose body contains "check_wordpress_integrity". The dashboard renders its
+ * integrity rows from this response, so await it before asserting on them.
  */
 function waitForIntegrityCheck(page: Page): Promise<Response> {
   return page.waitForResponse(
@@ -60,8 +60,8 @@ async function gotoDashboardAndWaitIntegrity(page: Page): Promise<void> {
 
 /**
  * Change the integrity per-page dropdown and wait for the re-render AJAX, then
- * assert the visible file-row count. Replaces the racy .sucuriscan-is-loading
- * "Loading..." gate with a deterministic waitForResponse + toHaveCount.
+ * assert the visible file-row count. Gating on the response (rather than on the
+ * transient .sucuriscan-is-loading "Loading..." class) keeps this deterministic.
  */
 async function selectPerPageAndExpectCount(
   page: Page,

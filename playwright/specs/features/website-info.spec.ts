@@ -2,8 +2,9 @@
  * Settings · Website Info tab (#webinfo): read-only checks on the
  * Environment Variables table and the Access File Integrity (.htaccess) panel.
  *
- * Pure read; no state is mutated and nothing needs cleanup. The page is
- * order-independent, so this describe runs in the default parallel mode.
+ * Pure read: the assertions mutate no plugin state. The only write is the
+ * beforeEach `touch` of the root .htaccess, which the access-file-integrity
+ * panel needs in order to report "found"; afterAll restores whatever was there.
  */
 import { test, expect } from "../../support/fixtures";
 import {

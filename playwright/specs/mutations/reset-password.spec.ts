@@ -18,8 +18,7 @@
  * `wordpress_logged_in` cookie (see support/fixtures.ts, which documents the same
  * footgun for loggedOutRequest). WordPress then no-ops the login form on correct
  * creds (no redirect to wp-admin) and masks the failed-login #login_error,
- * breaking both assertions. This is the Playwright analog of the Cypress
- * original's Cypress.session.clearAllSavedSessions()/clearCurrentSessionData().
+ * breaking both assertions.
  *
  * Idempotency: the reset randomizes sucuri-reset's password, so step 1 would
  * fail on re-run. The precondition is (re)seeded in beforeEach — NOT beforeAll,

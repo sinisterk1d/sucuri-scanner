@@ -8,9 +8,10 @@
  * `sucuriscan_waf_dismissed` !== '1'. So:
  *   - freemium baseline is mandatory -> beforeEach deletes the key + its
  *     encrypted twins so isPremium()/getKey() is false;
- *   - the admin storageState carries sucuriscan_waf_dismissed=1 (the Cypress
- *     login seeded it), so we override the cookie to '0' on the context BEFORE
- *     the first navigation, otherwise the modal would never render;
+ *   - the saved admin storageState carries sucuriscan_waf_dismissed=1 (seeded by
+ *     global.setup.ts so the modal never blocks clicks in other specs), so this
+ *     spec must override the cookie to '0' on the context BEFORE the first
+ *     navigation, otherwise the modal would never render;
  *   - once the CTA sets the cookie to '1', the markup is simply absent on the
  *     next server render — assert toHaveCount(0) after navigation (the node is
  *     removed from the DOM, not hidden), no reload needed.
@@ -65,8 +66,8 @@ test.describe("WAF activation modal", () => {
     });
 
     // The admin storageState seeds sucuriscan_waf_dismissed=1; reset it to '0'
-    // on the context so the very first server render shows the modal. This
-    // replaces the Cypress double-setCookie ordering hack (cy source 110/113).
+    // on the context so the very first server render shows the modal. The gate
+    // is server-side, so this must happen before the goto below, not after.
     await page.context().addCookies([
       {
         name: "sucuriscan_waf_dismissed",

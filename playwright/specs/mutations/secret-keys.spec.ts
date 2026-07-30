@@ -41,8 +41,9 @@ test.beforeEach(() => {
 });
 
 test.afterEach(() => {
-  // Defensively clear the auto-updater cron so the auto-updater starts Disabled
-  // on the next run regardless of where the test left off.
+  // Undo everything the rotation touched: wp-config.php (the AUTH_KEY/SALT
+  // constants), the auto-updater cron, and the admin's session tokens — so a
+  // filtered or repeated run never permanently rotates the environment.
   restoreWpConfig(originalWpConfig);
   restoreCron("sucuriscan_autoseckeyupdater", updaterCron);
   restoreSerializedUserMeta(adminUser.login, "session_tokens", adminSessions);
@@ -97,10 +98,10 @@ test("can update the secret keys", async ({ page }) => {
   );
 });
 
-// Ported from cypress it.skip "can reset installed plugins" (sucuri-scanner.cy.js
-// 738-751). Kept skipped: it re-downloads and reinstalls akismet from
-// api.wordpress.org (live-network dependent, slow) and mutates the plugins
-// filesystem (global-destructive), so it is unsafe/non-deterministic in CI.
+// SKIPPED. Re-downloads and reinstalls akismet from api.wordpress.org, so it is
+// live-network dependent, slow, and mutates the plugins filesystem for the whole
+// suite — unsafe and non-deterministic in CI. Enabling it needs a local plugin
+// fixture to reinstall from instead of the live network.
 test.skip("can reset installed plugins", async ({ page }) => {
   await page.goto(
     "/wp-admin/admin.php?page=sucuriscan_settings&sucuriscan_lastlogin=1#posthack",
@@ -111,7 +112,8 @@ test.skip("can reset installed plugins", async ({ page }) => {
 
   const response = page.getByTestId("sucuriscan_reset_plugin_response");
   await expect(response).toContainText("Loading");
-  // The original waited 2s for the reinstall; a real port would waitForResponse
-  // on the reset_plugin AJAX with a long timeout.
+  // If this is ever enabled, gate on the reset_plugin AJAX via waitForResponse
+  // with a generous timeout rather than on the text alone — a reinstall takes
+  // far longer than the default expect timeout.
   await expect(response).toContainText("Installed");
 });

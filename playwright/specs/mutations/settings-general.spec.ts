@@ -7,8 +7,9 @@
  * beforeEach pins the relevant options to a known baseline — making every test
  * order-independent and safe to re-run.
  *
- * Each selected test snapshots options/cron; datastore files are preserved by
- * the shared fixture even when the UI deletes every writable file.
+ * The beforeEach/afterEach snapshot and restore the full option set and the
+ * scheduled-scan cron; datastore files are preserved by the shared fixture even
+ * when the UI deletes every writable file.
  */
 import { test, expect } from "../../support/fixtures";
 import { expectNotice } from "../../support/notices";

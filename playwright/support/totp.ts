@@ -1,7 +1,7 @@
 /**
- * RFC-6238 TOTP generator, ported verbatim (logic-wise) from the old
- * cypress/plugins/index.js `totp` task. Used to derive a valid 6-digit code
- * from the base32 secret the plugin shows on the 2FA setup page.
+ * RFC-6238 TOTP generator. Used to derive a valid 6-digit code from the base32
+ * secret the plugin shows on the 2FA setup page, so the enrollment/verify flows
+ * can be driven end to end without an authenticator app.
  */
 import { createHmac } from "node:crypto";
 

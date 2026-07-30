@@ -2,8 +2,8 @@
  * `setup` project: provisions the named test users (idempotent safety net on
  * top of tests/e2e-prepare.sh) and captures an authenticated admin session as
  * a reusable storageState. Every functional project depends on this, so the
- * bulk of the suite never re-runs the UI login (the main speedup over Cypress's
- * per-test `cy.session`).
+ * bulk of the suite never re-runs the UI login — that reuse is the single
+ * largest contributor to the suite's wall-clock time.
  */
 import { test as setup } from "./fixtures";
 import {

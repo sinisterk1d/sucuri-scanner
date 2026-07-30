@@ -49,7 +49,7 @@ make update-translations   # wp i18n make-pot . lang/sucuri-scanner.pot
 ### CI
 - `.github/workflows/unit-tests.yml` — `composer install` + `make unit-test` on PHP 8.5.
 - `.github/workflows/end-to-end-tests.yml` — matrix over PHP 7.4/8.0 × latest WordPress, runs the
-  Cypress suites above via wp-env in Docker.
+  Playwright suite above via wp-env in Docker. Each matrix entry gets its own isolated wp-env.
 - `.github/workflows/deploy-to-wordpress-org.yml` — publishes tagged releases to wordpress.org
   (uses `.wordpress-org/` assets and `.gitattributes` `export-ignore` rules to strip dev files).
 
@@ -97,9 +97,12 @@ you likely need to add its `require` to both `sucuri.php` and `tests/autoload.ph
 - `src/event.lib.php` (`SucuriScanEvent`) — audit/event reporting, used throughout to log security
   events both locally and to the remote Sucuri API.
 - `src/cli.lib.php` — WP-CLI command surface, only loaded when `WP_CLI` is defined.
-- `cypress/` — E2E specs (`cypress/e2e/*.cy.js` for the current Cypress format, plus one legacy spec
-  under `cypress/integration/`), fixtures, and a `plugins/index.js` that wires custom Cypress tasks
-  (e.g. TOTP code generation for 2FA flows).
+- `playwright/` — E2E suite (TypeScript). `specs/features/` holds non-destructive specs and
+  `specs/mutations/` the global-destructive / auth-affecting ones; these map to the two Playwright
+  projects, both depending on a `setup` project that saves an admin `storageState`. `support/`
+  holds shared fixtures and helpers (`wp-cli.ts` for wp-env WP-CLI access, `auth.ts`, `notices.ts`,
+  `http.ts`, `totp.ts`, `pages/two-factor.page.ts`), and `data/` holds JSON AJAX fixtures. See
+  `playwright/support/README.md` for the authoring conventions.
 
 ### Testing conventions
 - Unit tests stub WordPress core functions with `Brain\Monkey\Functions\when(...)` per test in

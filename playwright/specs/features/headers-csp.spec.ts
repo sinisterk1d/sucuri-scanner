@@ -11,9 +11,9 @@
  * by the PHP option-array declaration order (allow-forms < allow-orientation-lock
  * < allow-popups), not by checkbox click order, so the exact strings are asserted.
  *
- * Front-end header reads use the unauthenticated `loggedOutRequest` fixture so
- * they mirror Cypress' anonymous `cy.request('/')` (csp.lib.php emits the header
- * on normal front-end requests).
+ * Front-end header reads use the unauthenticated `loggedOutRequest` fixture, so
+ * they hit the site the way a visitor does (csp.lib.php emits the header on
+ * normal front-end requests).
  *
  * The shared plugin-data fixture restores the original mode/directives afterward.
  */
@@ -43,8 +43,9 @@ async function submitCspForm(page: Page): Promise<void> {
 
 test.describe("Headers · Content-Security-Policy", () => {
   test.beforeEach(() => {
-    // Reset to clean state before the suite so a previous interrupted run that
-    // left any directive enforced doesn't break the first assertion.
+    // Reset to a clean state before each test so an earlier test (or an
+    // interrupted run) that left a directive enforced can't break the first
+    // assertion here.
     // Disabling the mode stops header emission; deleting the options object
     // causes the plugin to regenerate defaults (all enforced=false) on the next
     // page load — which is the clean baseline the first test requires.

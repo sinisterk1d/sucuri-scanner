@@ -3,8 +3,7 @@
  * extra fixtures without pulling in heavy page-object machinery they don't need.
  *
  * `loggedOutRequest` is an unauthenticated APIRequestContext used by the header
- * specs to assert response headers as an anonymous visitor (the Playwright
- * equivalent of `cy.clearCookies()` + `cy.request('/')`).
+ * and hardening specs to assert responses as an anonymous visitor.
  */
 import {
   test as base,
@@ -81,8 +80,7 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
   // That makes WordPress's is_user_logged_in() true and the Cache-Control
   // library serve its no-cache fallback even for front-end visits, masking the
   // per-tier max-age the header specs assert. Passing an explicit empty
-  // storageState clears the inherited admin cookies so the request is anonymous,
-  // matching Cypress's cy.clearCookies() + cy.request('/').
+  // storageState clears the inherited admin cookies so the request is anonymous.
   loggedOutRequest: async ({}, use) => {
     const context = await playwrightRequest.newContext({
       baseURL: BASE_URL,

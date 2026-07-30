@@ -1,7 +1,6 @@
 /**
  * Response-header / status assertions for the headers (Cache-Control, CSP, CORS)
- * and hardening (403/200) specs — the Playwright equivalent of `cy.request(...)`
- * followed by `expect(response.headers[...])`.
+ * and hardening (403/200) specs.
  *
  * Pass the authenticated `request` fixture for logged-in checks or the
  * `loggedOutRequest` fixture for anonymous checks. Playwright lowercases header

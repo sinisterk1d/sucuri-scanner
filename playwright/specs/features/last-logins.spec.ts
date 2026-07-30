@@ -2,13 +2,14 @@
  * Last Logins page (admin.php?page=sucuriscan_lastlogins): all-users / admins /
  * logged-in / failed tabs and the delete-logins-file actions.
  *
- * SKIPPED — carried over from the Cypress source as `it.skip`. It is flaky/
- * environment-fragile by nature: it deletes the on-disk lastlogins and
- * failedlogins datastore files and depends on a real failed-login attempt being
- * recorded (the original used cy.login with bad credentials, which races the
- * audit pipeline). Kept here, fully translated, so the scenario is visibly
- * accounted for and can be revived once the failed-login seeding is made
- * deterministic (e.g. via a wp-cli seed of sucuri-failedlogins.php).
+ * SKIPPED — environment-fragile by nature: it deletes the on-disk lastlogins and
+ * failedlogins datastore files, and it depends on a real failed-login attempt
+ * having been recorded, which races the audit pipeline (the submit below returns
+ * before the plugin has necessarily written the failed-login entry).
+ *
+ * Kept fully written out rather than deleted so the scenario stays visible. To
+ * enable it, replace the live bad-credentials login with a deterministic seed of
+ * sucuri-failedlogins.php via wp-cli, then drop the `.skip`.
  */
 import { test, expect } from "../../support/fixtures";
 import { login, submitLogin } from "../../support/auth";

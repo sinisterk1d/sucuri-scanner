@@ -6,17 +6,18 @@
  * (ignore / duplicate / toggle list / save monitored).
  *
  * Every test here mutates a global sucuriscan_* alert option on the single
- * shared WordPress DB, so the file runs serially and pins its preconditions in
- * beforeAll/beforeEach:
+ * shared WordPress DB, so the beforeEach re-pins every precondition each test
+ * depends on:
  *   - notify_post_publication must be enabled or the post-type panel renders
  *     disabled and its inputs cannot be interacted with.
  *   - The trusted-IP test asserts an empty table ("no data available"), so the
- *     `trustip` cache datastore is cleared before/after.
+ *     `trustip` cache datastore is cleared first.
  *   - The alert-subject success notice only fires when the submitted value
  *     differs from the stored one, so the subject is normalised to a known
- *     value that differs from the preset before each run.
- * afterAll restores the recipients, subject, ignored-events and toggled options
- * to a sane baseline so repeated runs never trip over leftover state.
+ *     value that differs from the preset the test submits.
+ * There is no afterEach: the shared `pluginDataSnapshot` fixture restores the
+ * whole datastore around every test, and re-pinning in beforeEach means a run
+ * interrupted mid-test still starts the next one from a known baseline.
  */
 import { test, expect } from "../../support/fixtures";
 import type { Page } from "@playwright/test";
@@ -24,8 +25,9 @@ import { expectNotice } from "../../support/notices";
 import { updateOption, wpEval } from "../../support/wp-cli";
 
 const ALERTS_URL = "/wp-admin/admin.php?page=sucuriscan_settings#alerts";
-// The recipients flow in the original Cypress source deep-links with
-// &sucuriscan_lastlogin=1; preserved verbatim (cosmetic, but kept for parity).
+// The recipients flow deep-links with &sucuriscan_lastlogin=1. The parameter has
+// no bearing on the alerts panel; it is kept so this test exercises the same URL
+// shape the plugin links to from the last-login notice.
 const ALERTS_URL_RECIPIENTS =
   "/wp-admin/admin.php?page=sucuriscan_settings&sucuriscan_lastlogin=1#alerts";
 
@@ -164,7 +166,7 @@ test.describe("Settings · Alerts", () => {
   test("can modify alert subject", async ({ page }) => {
     await page.goto(ALERTS_URL);
 
-    // Preset subject -> success notice (beforeAll seeded a different value).
+    // Preset subject -> success notice (beforeEach seeded a different value).
     await page
       .locator(
         `input[name="sucuriscan_email_subject"][value="${PRESET_SUBJECT}"]`,

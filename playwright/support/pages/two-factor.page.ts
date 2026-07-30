@@ -84,7 +84,10 @@ export class TwoFactorAdminPage {
     mode: BulkMode = "activate_selected",
   ): Promise<void> {
     await this.goto();
-    // Clear any prior selection state the way the Cypress helper did.
+    // `activate_selected` MERGES the ticked rows into the stored
+    // :twofactor_users list (topt.lib.php), so a leftover selection from an
+    // earlier test would stay enforced. `deactivate_all` resets that list to
+    // empty, which is what makes the enforce below start from a clean slate.
     await this.page.getByTestId("twofactor-user-checkbox-1").check();
     await this.applyBulk("deactivate_all");
     // Wait for the deactivate reload to land before selecting users: otherwise the

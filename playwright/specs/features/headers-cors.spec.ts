@@ -5,7 +5,7 @@
  * jQuery enable/disable toggle, saving the Access-Control-Allow-Origin value,
  * the Access-Control-Allow-Methods multi-checkbox logic, Allow-Credentials
  * set/unset, and disabling the whole CORS mode. Front-end headers are read as
- * an anonymous visitor via the `loggedOutRequest` fixture (mirrors cy.request('/')).
+ * an anonymous visitor via the `loggedOutRequest` fixture.
  *
  * Each test resets the CORS option object and explicitly selects its mode, so
  * scenarios can run independently. The CORS form POST

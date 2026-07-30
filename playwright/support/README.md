@@ -42,7 +42,7 @@ isolated wp-env.
   For non-`data-cy` elements prefer `getByRole`/`getByLabel`; keep
   `input[name="…"]` when the field name is the natural stable hook. Avoid
   nth-child / class chains.
-- **No fixed waits**: never port `cy.wait(ms)`. Use web-first assertions
+- **No fixed waits**: never `waitForTimeout`. Use web-first assertions
   (`expect(locator).toContainText/toHaveValue/toBeVisible`), `page.waitForResponse`
   for AJAX, and `page.route` to stub admin-ajax calls.
 - **Notices**: `await expectNotice(page, 'exact substring')` — tolerant of the
@@ -102,6 +102,31 @@ npm run test:e2e -- --project=mutations --grep='password'
 npm run test:e2e:setup           # refresh auth before --no-deps/UI debugging
 ```
 
-The intentionally skipped hardening-all, plugin-reinstall, and last-login tests
-still require dedicated fixture work and should not be enabled for arbitrary
-local subsets.
+## Environment prerequisites
+
+These are environment facts the suite depends on; when a spec fails for no
+obvious reason, check them first.
+
+- **`wp-config.php` must be writable** by the wp-env `tests-cli` user, and
+  `openssl aes-256-gcm` must be available — otherwise the plugin silently falls
+  back to plaintext storage and the WAF plug-salt assertions fail for reasons
+  that have nothing to do with the code under test.
+- The integrity diff-utility toggle needs the Unix `diff` binary on the wp-env host.
+- The "test alert" emails invoke real `wp_mail`, which is a silent no-op in
+  wp-env. They are not stubbed, and nothing asserts delivery.
+- `SUCURI_BASE_URL` must point at the local wp-env **tests** port: the browser
+  and the WP-CLI cleanup have to target the same installation, and `support/env.ts`
+  throws if they diverge.
+
+## Deliberate coverage gaps
+
+- **No live-WAF tests.** Exercising a real firewall API key mutates a shared
+  external Sucuri account (blocklist, cache flush) with no way to guarantee
+  remote cleanup, and it exposes the key to failure artifacts. Do not add tests
+  that talk to the live WAF; stub `admin-ajax.php` with `page.route` instead.
+- **Three `test.skip` tests** are kept written out rather than deleted, each with
+  its reason and what enabling it would take, in the file header or above the
+  test: "toggle hardening options" (`mutations/hardening.spec.ts`), "reset
+  installed plugins" (`mutations/secret-keys.spec.ts`), and "last logins"
+  (`features/last-logins.spec.ts`). They need dedicated fixture work and should
+  not be switched on for a local subset run.

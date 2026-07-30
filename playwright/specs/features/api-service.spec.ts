@@ -3,12 +3,12 @@
  * enable/disable toggle and the WordPress Checksums API URL.
  *
  * State pinning: the toggle test asserts the Enable/Disable button label and a
- * paired change notice that depend on the option value at page load. Cypress
- * relied on an earlier in-file "import JSON settings" test leaving
- * sucuriscan_api_service='enabled'; that hidden ordering dependency is replaced
- * here by an explicit beforeEach seed, so the test is order-independent and
- * re-runnable. The toggle is enable-able only because SUCURISCAN_API_URL is
- * defined in .wp-env.json — otherwise the button is forced to "Enable".
+ * paired change notice that depend on the option value at page load, so the
+ * beforeEach seeds sucuriscan_api_service='enabled' explicitly rather than
+ * relying on another test having enabled it — keeping this file order-
+ * independent and re-runnable. The toggle is enable-able only because
+ * SUCURISCAN_API_URL is defined in .wp-env.json — otherwise the button is
+ * forced to "Enable".
  *
  * The checksum test stores a valid GitHub repository and verifies the resolved
  * API URL. The shared plugin-data fixture restores the prior options.

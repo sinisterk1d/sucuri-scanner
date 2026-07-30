@@ -1,9 +1,9 @@
 /**
  * Central environment + test-data configuration for the Playwright e2e suite.
  *
- * Values mirror the old `cypress.config.js.example` env block and the users
- * created by `tests/e2e-prepare.sh`. Everything is overridable via process.env
- * so the same suite runs locally and in CI without code changes.
+ * The logins and passwords below mirror the accounts provisioned by
+ * `tests/e2e-prepare.sh`. Everything is overridable via process.env so the same
+ * suite runs locally and in CI without code changes.
  */
 import path from "node:path";
 

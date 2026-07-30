@@ -9,14 +9,14 @@
  * directive to logged-IN visitors and the tier max-age to logged-OUT visitors
  * (cachecontrol.lib.php isNoCacheable() -> is_user_logged_in()). So the
  * anonymous header reads use the `loggedOutRequest` fixture (a fresh,
- * cookie-less APIRequestContext, the equivalent of Cypress's cy.clearCookies()),
- * while the single logged-in check uses the authenticated `request` fixture,
- * which inherits the admin storageState from the `features` project.
+ * cookie-less APIRequestContext), while the single logged-in check uses the
+ * authenticated `request` fixture, which inherits the admin storageState from
+ * the `features` project.
  *
  * The per-post-type custom max-age and old-age-multiplier values are persisted
  * by a background jQuery $.post fired when a row collapses (Edit -> Update). That
  * POST is awaited via waitForResponse before reading the header / reloading, so
- * the GET never races the option write (the top flakiness source per blueprint).
+ * the GET never races the option write — the main flakiness risk in this file.
  *
  * Each test resets cache options, temporarily quarantines future posts, and uses
  * test-owned content IDs. The shared fixture restores plugin options afterward.
@@ -136,7 +136,7 @@ async function collapsePostsRowAndPersist(page: Page): Promise<void> {
  * CSP and CORS status boxes that share the `.sucuriscan-hstatus-1` class, and
  * the row-collapse JS (`$('.sucuriscan-double-box-update')`) flips all three at
  * once — so a bare `.sucuriscan-hstatus-1` locator matches 3 elements and trips
- * Playwright strict mode (Cypress's `.contains()` silently took the first).
+ * Playwright strict mode.
  */
 async function expectCacheControlEnabled(page: Page): Promise<void> {
   const box = page.getByTestId("sucuriscan_headers_cache_control");

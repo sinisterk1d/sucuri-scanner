@@ -1,18 +1,19 @@
 /**
- * Two-Factor Authentication (TOTP) — the full describe block from the Cypress
- * suite: admin bulk-policy controls (admin.php?page=sucuriscan_2fa), the
- * wp-login challenge/setup flows (action=sucuri-2fa / -setup), the profile-page
- * reset, dashboard self-enrollment with enforce-all, the 5-attempt lockout, and
- * replay rejection.
+ * Two-Factor Authentication (TOTP): admin bulk-policy controls
+ * (admin.php?page=sucuriscan_2fa), the wp-login challenge/setup flows
+ * (action=sucuri-2fa / -setup), the profile-page reset, dashboard
+ * self-enrollment with enforce-all, the 5-attempt lockout, and replay rejection.
  *
- * HIGHEST-RISK suite: tests enforce 2FA on the SHARED default admin (id 1). If a
- * test fails mid-flow direct before/after cleanup disables enforcement, removes
- * all TOTP metadata/login transients, and restores named-user session metadata.
+ * HIGHEST-RISK spec in the suite: these tests enforce 2FA on the SHARED default
+ * admin (id 1), so a test that dies mid-flow could lock every later spec out of
+ * wp-admin. The beforeEach/afterEach below therefore reset enforcement, remove
+ * all TOTP metadata and login transients, and restore named-user session
+ * metadata unconditionally — they must keep working even when a test fails.
  *
  * Bulk-policy actions reuse the inherited admin `page` (its auth cookies were
  * captured before any enforcement and stay valid — enforcement only gates fresh
- * logins). Per-user login challenges run in FRESH browser contexts (one page per
- * user), the equivalent of the Cypress clearAllSavedSessions/clearCookies.
+ * logins). Per-user login challenges need a session that has NOT already cleared
+ * the challenge, so each one runs in a fresh browser context with empty storage.
  *
  * TOTP codes are computed immediately before submitting; the plugin's ±2 step
  * allowance covers the round-trip. The replay test deliberately REUSES the exact
@@ -88,6 +89,13 @@ async function waitForUsersTable(page: Page): Promise<void> {
   ).toBeVisible();
 }
 
+/**
+ * Force 2FA back to a disabled, un-enrolled state directly through WP-CLI:
+ * disable the mode, empty the enforced-user list, drop every user's TOTP secret
+ * and last-success meta, delete the pending-login transients, and destroy the
+ * named test users' sessions. Deliberately bypasses the admin UI so it still
+ * works when a previous test left the UI itself behind a 2FA challenge.
+ */
 function resetTwoFactorState(): void {
   wpEval(
     "SucuriScanOption::updateOption(':twofactor_mode','disabled');" +
@@ -116,9 +124,10 @@ function ensureBulkUsers(): void {
 }
 
 /**
- * Run a wp-login flow for `user` in an isolated context (fresh cookies/storage),
- * mirroring Cypress's per-user `cy.session` + clearAllSavedSessions. The WAF
- * dismiss cookie is seeded so the activation modal never blocks the form.
+ * Run a wp-login flow for `user` in an isolated context (fresh cookies/storage)
+ * so the login actually hits the 2FA challenge instead of reusing the project's
+ * already-authenticated admin session. The WAF dismiss cookie is seeded so the
+ * activation modal never blocks the form.
  */
 async function withFreshUser(
   browser: Browser,
@@ -167,8 +176,6 @@ test.describe("Two-Factor Authentication", () => {
     restoreRawOptionsByPrefix(TRANSIENT_PREFIXES, loginTransients);
   });
 
-  // Belt-and-braces fallback: force disabled mode and drop every relevant
-  // user's TOTP meta directly, in case the UI teardown above ever fails.
   test("enforces 2FA for all users and completes verify with a valid code", async ({
     page,
     browser,
@@ -272,8 +279,8 @@ test.describe("Two-Factor Authentication", () => {
 
       // The reset swaps in the profile setup snippet (profile-2fa-setup.snippet.tpl),
       // whose secret is a PLAIN <code> with no class (the sucuriscan-2fa-secret-code
-      // class is dashboard-only). Scope to that snippet's code — mirrors the Cypress
-      // `cy.get('code').first()` check while staying within the freshly-rendered view.
+      // class is dashboard-only). Scope to that snippet's <code> so the assertion
+      // stays inside the freshly-rendered view.
       await expect(
         p.locator(".sucuriscan-profile-2fa-setup code").first(),
       ).toBeVisible();
@@ -340,8 +347,8 @@ test.describe("Two-Factor Authentication", () => {
       await loginExpect2FA(p, extraUser, "setup");
     });
 
-    // NOTE: the Cypress original omitted cleanup here, leaving extraUser
-    // enforced; the afterEach resetEverything below covers it.
+    // No in-test cleanup: this test deliberately ends with extraUser still
+    // enforced, and the afterEach reset is what clears it.
   });
 
   test("activates 2fa for all users and disables it again", async ({
@@ -352,9 +359,9 @@ test.describe("Two-Factor Authentication", () => {
 
     await admin2fa.setModeAllUsers("activate_all");
 
-    // admin has no secret yet, so the first enforced login lands on SETUP.
-    // (The Cypress helper's default 'verify' assertion passed only because its
-    // substring checks also match the setup screen; here we assert precisely.)
+    // admin has no secret yet, so the first enforced login lands on SETUP, not
+    // VERIFY. expectChallenge() distinguishes the two by exact action param
+    // (`sucuri-2fa-setup` vs `sucuri-2fa`), so this is asserted precisely.
     await withFreshUser(browser, async (p) => {
       await loginExpect2FA(p, adminUser, "setup");
       await completeSetupWithGeneratedCode(p);
@@ -520,10 +527,9 @@ test.describe("Two-Factor Authentication", () => {
     ]);
     await expect(page).toHaveURL(/\/wp-admin\//);
 
-    // The Cypress original ran this logged in AS the enrolling user, so that
-    // user hit VERIFY and the rest SETUP. The Playwright suite's inherited
-    // session is the default `admin` (id 1), so admin is the enrollee here:
-    // admin -> VERIFY (secret now stored), the other two -> SETUP (no secret).
+    // The enrollee is whoever the inherited session belongs to — the default
+    // `admin` (id 1) — so only admin now has a stored secret:
+    // admin -> VERIFY, the other two -> SETUP (no secret yet).
     await withFreshUser(browser, async (p) => {
       await loginExpect2FA(p, adminUser, "verify");
     });

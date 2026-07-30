@@ -10,9 +10,9 @@
  * resetting state, beforeAll re-seeds the plaintext key and deletes both secret
  * options via tests/e2e-seed-waf-migration.sh, making the test re-runnable.
  *
- * The live WAF AJAX is fully neutralised with page.route — the old Cypress
- * `get_firewall_settings` intercept was a dead no-op (the real page POSTs
- * form_action='firewall_settings'); migration does not depend on it.
+ * The firewall page's live WAF AJAX is fully neutralised with page.route so the
+ * render never hangs on the real Sucuri API. The migration does not depend on
+ * that AJAX, so stubbing it cannot mask the behaviour under test.
  */
 import { test, expect } from "../../support/fixtures";
 import {
@@ -75,7 +75,7 @@ test.describe("WAF key migration", () => {
 
     // Neutralise every live WAF AJAX call so the page render never hangs on the
     // real Sucuri API. Migration is triggered server-side by the page render,
-    // not by this AJAX (the old get_firewall_settings stub was a dead no-op).
+    // not by this AJAX, so the stub cannot hide a failure to migrate.
     await page.route("**/admin-ajax.php**", (route) =>
       route.fulfill({
         status: 200,

@@ -1,8 +1,8 @@
 /**
- * WordPress login helpers — the Playwright equivalent of the Cypress
- * `cy.login` custom command. The bulk of the suite reuses a saved admin
+ * WordPress login helpers. The bulk of the suite reuses a saved admin
  * storageState (see global.setup.ts) instead of logging in per test; these
- * helpers are for flows that must authenticate fresh (e.g. 2FA challenges).
+ * helpers are for flows that must authenticate fresh (e.g. 2FA challenges, or
+ * re-authenticating after a test rotates the WordPress secret keys).
  */
 import fs from "node:fs";
 import path from "node:path";

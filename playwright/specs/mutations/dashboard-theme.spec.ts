@@ -51,6 +51,15 @@ function restoreFreemiumBaseline(): void {
   restoreUserMeta(adminUser.login, "sucuriscan_preferred_theme", null);
 }
 
+/**
+ * Neutralise the two admin-ajax calls that would otherwise reach the network:
+ * the firewall settings fetch, and the core/PHP vulnerability scan. The scan is
+ * stubbed to fail immediately because the premium dashboard fires two sequential
+ * 30s external-API requests, which would push these tests past the test timeout.
+ *
+ * Must be registered before the first navigation — both requests fire on the
+ * page's initial render. Everything else falls through to the real server.
+ */
 async function stubExternalAjax(page: import("@playwright/test").Page): Promise<void> {
   await page.route("**/admin-ajax.php**", async (route) => {
     const body = route.request().postData() ?? "";
@@ -100,9 +109,9 @@ test.describe("Dashboard theme gating", () => {
     await expect(page.locator("#core-vulnerability-results")).not.toBeVisible();
     await expect(page.locator("#php-vulnerability-results")).not.toBeVisible();
     // Both list bodies (Plugins + Themes) sit inside the PremiumVisibility wrapper,
-    // which is display:none in freemium — present in the DOM but hidden. Mirror the
-    // Cypress `should('not.be.visible')` over the matched set: strict mode forbids
-    // not.toBeVisible() on a multi-element locator, so assert the count and check each.
+    // which is display:none in freemium — present in the DOM but hidden. Strict mode
+    // forbids not.toBeVisible() on a multi-element locator, so assert the count and
+    // then check each element individually.
     const themeBodies = page.locator(".sucuriscan-themes-list-body");
     await expect(themeBodies).toHaveCount(2);
     await expect(themeBodies.first()).not.toBeVisible();
@@ -121,8 +130,8 @@ test.describe("Dashboard theme gating", () => {
     ) {
       // The "Update" entry is an <option> inside a hover-revealed custom dropdown
       // (firewall-settings.html.tpl:114-118) with a jQuery click handler bound to
-      // it. Playwright can't .click() a hidden <option>; dispatchEvent fires the
-      // handler directly — the faithful equivalent of Cypress's synthetic click.
+      // it. Playwright can't .click() a hidden <option>, so dispatchEvent fires
+      // that handler directly.
       await page
         .locator('#sucuriscan-waf-key-options option[value="update"]')
         .dispatchEvent("click");
@@ -134,17 +143,14 @@ test.describe("Dashboard theme gating", () => {
     await page.getByTestId("sucuriscan-save-wafkey").click();
     // Confirm the key was actually saved before navigating away. Saving a key also
     // flips the reverse-proxy + addr-header settings, so THREE success alerts render;
-    // filter to the key one (Cypress's .contains() picked the matching node, Playwright
-    // strict mode forbids toContainText over a multi-element locator).
+    // filter to the key one, since strict mode forbids toContainText over a
+    // multi-element locator.
     await expect(
       page
         .locator(".sucuriscan-alert-updated")
         .filter({ hasText: "Firewall API key was successfully saved" }),
     ).toBeVisible();
 
-    // Stub the vulnerability-scan AJAX to fail immediately, avoiding a ~60s wait
-    // for two sequential 30s external-API timeouts. Register BEFORE visiting the
-    // dashboard so the background scan request is intercepted on first render.
     await page.goto(DASHBOARD_URL);
 
     await expect(page.locator(".unlock-premium")).not.toBeVisible();

@@ -163,6 +163,7 @@ test("filters audit logs by plugin, login, and time", async ({ page }) => {
   await expectAllEntryTitles(page, /User authentication succeeded/);
   await clearFilter(page);
 
-  // NOTE: the 'Custom' date-range branch was intentionally disabled (commented
-  // out) in the Cypress source and is therefore not migrated. See MIGRATION.md.
+  // NOTE: the 'Custom' date-range branch of the time filter is deliberately not
+  // covered here — it needs a #startDate/#endDate pair seeded relative to the
+  // audit entries, which the fixed fixture data above cannot provide.
 });

@@ -1,10 +1,11 @@
 /**
  * Thin wrappers around `npx wp-env run tests-cli …` for the e2e suite.
  *
- * These replace the Cypress `cy.task('exec', …)` helper and the inline
- * `php -r` snippets that the WAF specs used. Commands are passed as argv without
- * host-shell interpretation. These helpers require a running wp-env
- * (Docker) — they are used from spec setup/teardown, never from page actions.
+ * Specs use these to read and write WordPress/plugin state directly (options,
+ * users, cron, files) for seeding and teardown. Commands are passed as argv
+ * without host-shell interpretation. Every call requires a running wp-env
+ * (Docker) and is synchronous, so use them from spec setup/teardown only —
+ * never interleaved with page actions.
  */
 import { execFileSync } from "node:child_process";
 import path from "node:path";

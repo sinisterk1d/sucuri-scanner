@@ -6,8 +6,10 @@
  * wildcard (".*") rules, preserving literal regex characters, the full 403<->200
  * add/remove round-trip, and multi-file add + Select-All removal.
  *
- * SHARED STATE / IDEMPOTENCY: every selected test re-seeds its own .htaccess and
- * PHP fixtures. The spec snapshots and restores the user's original files.
+ * SHARED STATE / IDEMPOTENCY: the beforeEach re-seeds the .htaccess and PHP
+ * fixtures for every test, and the spec snapshots and restores the original
+ * files around the whole file. This matters because the legacy-removal test
+ * permanently rewrites wp-content/.htaccess.
  */
 import { test, expect } from "../../support/fixtures";
 import type { APIRequestContext, Page } from "@playwright/test";
@@ -91,8 +93,8 @@ async function addAllowlistFile(
 
 /**
  * Poll the public URL until Apache reflects the just-written .htaccess rule, then
- * run the body assertion. Absorbs the brief lag between the form POST and Apache
- * serving the new rule (replaces any implicit Cypress retry / cy.wait).
+ * run the body assertion. Absorbs the brief lag between the form POST returning
+ * and Apache actually serving the new rule.
  */
 async function expectPublicStatus(
   request: APIRequestContext,
@@ -125,13 +127,16 @@ test.afterAll(() => {
   restoreWpFiles(originalFiles);
 });
 
-// SKIPPED in the Cypress source (it.skip). Toggles every hardening option on the
-// prevention page (firewall premium notice; wpuploads/wpcontent/wpincludes
-// apply+revert; fileeditor apply+revert which mutates wp-config.php
-// DISALLOW_FILE_EDIT; autoSecretKeyUpdater enable/disable which mutates WP cron).
-// Kept skipped: it depends on a premium/firewall state plus filesystem hardening
-// (.htaccess + wp-config.php + cron) that is environment-fragile — a crash
-// between an apply and its revert leaves persistent state that breaks re-runs.
+// SKIPPED. Toggles every hardening option on the prevention page (firewall
+// premium notice; wpuploads/wpcontent/wpincludes apply+revert; fileeditor
+// apply+revert, which mutates wp-config.php DISALLOW_FILE_EDIT;
+// autoSecretKeyUpdater enable/disable, which mutates WP cron).
+//
+// Why it stays skipped: it depends on a premium/firewall state plus filesystem
+// hardening (.htaccess + wp-config.php + cron) that is environment-fragile — a
+// crash between an apply and its revert leaves persistent state that breaks
+// re-runs. Enabling it needs snapshot/restore of wp-config.php and cron around
+// each apply/revert pair, as secret-keys.spec.ts does.
 test.skip("can toggle hardening options", async ({ page }) => {
   await page.goto(HARDENING_URL);
 

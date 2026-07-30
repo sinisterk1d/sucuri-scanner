@@ -18,10 +18,10 @@
  *      stable-salt behavior after deterministic constants are installed: a
  *      re-saved key remains decryptable without rotating the constants.
  *
- * Each test seeds its own wp-config.php / option preconditions. Live WAF AJAX is neutralised with
- * page.route — the old Cypress get_firewall_settings intercept was a dead no-op
- * (the real page POSTs form_action='firewall_settings'); migration is triggered
- * server-side by the page render, not the AJAX.
+ * Each test seeds its own wp-config.php / option preconditions. The firewall
+ * page's live AJAX calls are neutralised with page.route so the render never
+ * hangs on the real Sucuri API; the migration itself is triggered server-side by
+ * the page render, not by any AJAX, so stubbing cannot mask it.
  *
  * Preconditions (asserted/relied upon): wp-config.php is writable by the wp-env
  * tests-cli user and contains the canonical "/* That's all, stop editing!"
