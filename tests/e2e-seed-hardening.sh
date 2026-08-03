@@ -4,13 +4,16 @@ set -e
 # Idempotent re-seed of the "Allow Blocked PHP Files" hardening fixtures.
 #
 # Runs inside the wp-env tests-cli container (cwd = WP docroot, /var/www/html),
-# invoked from the Playwright hardening spec via runPluginScript() in beforeAll.
+# invoked from the Playwright hardening spec via runPluginScript() in beforeAll,
+# and from tests/e2e-prepare.sh when the environment is reset.
 #
 # The legacy-rule-removal test PERMANENTLY rewrites wp-content/.htaccess (drops
 # the <Files archive-legacy.php> grant), flipping archive-legacy.php from 200 to
 # 403. Re-running this script restores the seeded state so the spec is
-# re-runnable from a clean baseline on every run. Mirrors the hardening block of
-# tests/e2e-prepare.sh (lines 17-58).
+# re-runnable from a clean baseline on every run.
+#
+# This is the ONLY definition of these fixtures — e2e-prepare.sh delegates here
+# rather than keeping a second copy that drifts.
 
 # PHP files served by Apache (echo "Hello, world!" so expectHelloWorld passes).
 mkdir -p wp-includes/test-1

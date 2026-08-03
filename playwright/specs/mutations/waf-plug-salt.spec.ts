@@ -208,9 +208,7 @@ test.describe("SUCURI_PLUG_* salt - fresh key save and decrypt", () => {
     deleteRawOption("sucuriscan_secret_cloudproxy_apikey");
     deleteRawOption("sucuriscan_no_salt_encryption");
     deleteRawOption("sucuriscan_waf_key_decrypt_error");
-    wpEval(
-      `SucuriScanOption::updateOption(":cloudproxy_apikey", "${NEW_KEY}");`,
-    );
+    runPluginScript("tests/e2e-seed-waf-key.sh", "save", NEW_KEY);
   });
 
   test("stores a newly saved key as v:2 and replaces constants in wp-config.php", () => {
@@ -245,9 +243,7 @@ test.describe("SUCURI_PLUG_* salt - fresh key save and decrypt", () => {
     // round-trips, NOT that the constants are regenerated. (Regenerating constants is
     // a separate path, maybeHealMisplacedPluginSalt, which only fires for defines
     // placed OUTSIDE the <?php block — the historical key-leak bug.)
-    wpEval(
-      `SucuriScanOption::updateOption(":cloudproxy_apikey", "${CORRUPT_RECOVERY_KEY}");`,
-    );
+    runPluginScript("tests/e2e-seed-waf-key.sh", "save", CORRUPT_RECOVERY_KEY);
 
     // The new key reads back cleanly: encrypted and decrypted with the same salt.
     const output = wpEval(

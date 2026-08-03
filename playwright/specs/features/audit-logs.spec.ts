@@ -3,13 +3,13 @@
  * and filtering the local audit log (plugins / logins / time).
  *
  * The send-logs test stubs the two admin-ajax actions so it never calls the
- * real Sucuri API; the filter test runs against the real seeded audit data
- * (akismet activation events + admin logins from tests/e2e-prepare.sh).
+ * real Sucuri API; the filter test runs against real audit data rebuilt before
+ * every test by tests/e2e-seed-audit-logs.sh.
  */
 import path from "node:path";
 import { test, expect } from "../../support/fixtures";
 import type { Page } from "@playwright/test";
-import { wpEval } from "../../support/wp-cli";
+import { seedAuditQueue } from "../../support/audit-logs";
 
 const DATA_DIR = path.join(__dirname, "../../data");
 const AUDIT_LOGS_FIXTURE = path.join(DATA_DIR, "audit_logs.json");
@@ -17,15 +17,6 @@ const SEND_LOGS_FIXTURE = path.join(DATA_DIR, "auditlogs_send_logs.json");
 
 const REPORTING_URL =
   "/wp-admin/admin.php?page=sucuriscan_events_reporting#auditlogs";
-
-function seedAuditQueue(): void {
-  wpEval(
-    '@unlink(SucuriScan::dataStorePath("sucuri-auditqueue.php"));' +
-      '@unlink(SucuriScan::dataStorePath("sucuri-auditlogs.php"));' +
-      'SucuriScanEvent::reportWarningEvent("Plugin activated: Akismet Anti-spam");' +
-      'SucuriScanEvent::reportNoticeEvent("User authentication succeeded: admin");',
-  );
-}
 
 test.beforeEach(() => {
   seedAuditQueue();

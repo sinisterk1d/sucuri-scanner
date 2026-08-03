@@ -57,11 +57,19 @@ export function wp(...subcommand: string[]): string {
   return wpEnvRun("wp", ...subcommand);
 }
 
-/** Run a bash script that lives inside the plugin directory (relative to the plugin root). */
-export function runPluginScript(relativePath: string): string {
+/**
+ * Run a bash script that lives inside the plugin directory (relative to the
+ * plugin root). Trailing arguments are passed through to the script as $1, $2,
+ * … via execFile, so they are never re-parsed by a shell.
+ */
+export function runPluginScript(
+  relativePath: string,
+  ...args: string[]
+): string {
   return wpEnvRun(
     "bash",
     `wp-content/plugins/${PLUGIN_SLUG}/${relativePath}`,
+    ...args,
   );
 }
 

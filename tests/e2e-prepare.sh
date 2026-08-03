@@ -1,6 +1,16 @@
 #!/bin/bash
 set -e
 
+# Canonical wp-env baseline. Run once by tests/e2e-reset-env.sh, after
+# `wp-env clean tests`, with cwd = the WP docroot.
+#
+# Per-spec fixtures are NOT reimplemented here. Each one is owned by the seed
+# script its spec calls, and this file only warms them up so a full-suite run
+# starts where a targeted run would arrive on its own. Adding or changing a
+# fixture means editing its seed script; this file just delegates.
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
 # Create or repair users.
 ensure_user() {
     local login="$1"
@@ -18,14 +28,11 @@ ensure_user sucuri sucuri@sucuri.net author
 ensure_user sucuri-admin sucuri-admin@sucuri.net administrator
 ensure_user sucuri-reset sucuri-reset@sucuri.net author
 
-# Create a large batch of users to exercise the paginated/searchable
-# Two-Factor users table (mirrors WooCommerce-scale sites). These are created
-# AFTER the named users above so the named users stay on the first page when
-# ordered by ID ascending (25 users per page).
-for i in $(seq 1 60); do
-    n=$(printf '%03d' "$i")
-    ensure_user "bulkuser-$n" "bulkuser-$n@sucuri.net" subscriber
-done
+# A large batch of subscribers, to exercise the paginated/searchable Two-Factor
+# users table (mirrors WooCommerce-scale sites). Seeded AFTER the named users
+# above so those stay on the first page when ordered by ID ascending (25 per
+# page). Owned by the two-factor seed script, which prints the IDs it created.
+bash "$SCRIPT_DIR/e2e-seed-two-factor.sh" seed-bulk-users 60 >/dev/null
 
 # Install plugins
 if wp plugin is-installed akismet; then
@@ -34,50 +41,17 @@ else
     wp plugin install akismet --activate
 fi
 
-# Create test files in WP root
+# ABSPATH .htaccess — read by the Website Info access-file-integrity panel.
+# The spec touches this itself and snapshots/restores it; seeded here so the
+# panel has something to report on a freshly reset environment.
 touch .htaccess
-touch wp-config-test.php
-touch wp-test-file-{1..100}.php
 
-# Hardening tests setup
-mkdir -p wp-includes/test-1
-touch wp-includes/test-1/test-{1..3}.php
-printf '%s\n' '<?php echo "Hello, world!"; ?>' > wp-content/archive-legacy.php
-printf '%s\n' '<?php echo "Hello, world!"; ?>' > wp-content/archive.php
-printf '%s\n' '<?php echo "Hello, world!"; ?>' > 'wp-content/literal.(a|b)*.php'
-printf '%s\n' '<?php echo "Hello, world!"; ?>' > 'wp-content/literal.a.php'
+# Scanner integrity baseline: wp-config-test.php + wp-test-file-1..100.php.
+# NOTE: this also pins the wp_update_plugins cron, exactly as the scanner spec's
+# beforeEach does. Harmless — the spec re-pins and restores it per test.
+bash "$SCRIPT_DIR/e2e-seed-scanner.sh" seed 100
 
-# Create .htaccess file inside the wp-includes directory
-cat <<EOF > wp-includes/.htaccess
-<FilesMatch "\.(?i:php)$">
-  <IfModule !mod_authz_core.c>
-    Order allow,deny
-    Deny from all
-  </IfModule>
-  <IfModule mod_authz_core.c>
-    Require all denied
-  </IfModule>
-</FilesMatch>
-EOF
-
-# Create .htaccess file inside the wp-content directory with legacy hardening rules
-cat <<EOF > wp-content/.htaccess
-<FilesMatch "\.(?i:php)$">
-  <IfModule !mod_authz_core.c>
-    Order allow,deny
-    Deny from all
-  </IfModule>
-  <IfModule mod_authz_core.c>
-    Require all denied
-  </IfModule>
-</FilesMatch>
-
-<Files archive-legacy.php>
-  <IfModule !mod_authz_core.c>
-    Allow from all
-  </IfModule>
-  <IfModule mod_authz_core.c>
-    Require all granted
-  </IfModule>
-</Files>
-EOF
+# Hardening fixtures: wp-includes/test-1/*.php, the hello-world PHP files under
+# wp-content, and the deny-all .htaccess pair (with the legacy archive-legacy.php
+# grant that the legacy-rule-removal test strips).
+bash "$SCRIPT_DIR/e2e-seed-hardening.sh"

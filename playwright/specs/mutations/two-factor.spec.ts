@@ -38,11 +38,15 @@ import {
   snapshotAllUserMeta,
   snapshotPluginData,
   snapshotRawOptionsByPrefix,
-  wpEval,
   type AllUserMetaSnapshot,
   type PluginDataSnapshot,
   type RawOptionSnapshot,
 } from "../../support/wp-cli";
+import {
+  createBulkUsers,
+  deleteUsers,
+  resetTwoFactorState,
+} from "../../support/two-factor-state";
 import {
   adminUser,
   testAdminUser,
@@ -89,38 +93,14 @@ async function waitForUsersTable(page: Page): Promise<void> {
   ).toBeVisible();
 }
 
-/**
- * Force 2FA back to a disabled, un-enrolled state directly through WP-CLI:
- * disable the mode, empty the enforced-user list, drop every user's TOTP secret
- * and last-success meta, delete the pending-login transients, and destroy the
- * named test users' sessions. Deliberately bypasses the admin UI so it still
- * works when a previous test left the UI itself behind a 2FA challenge.
- */
-function resetTwoFactorState(): void {
-  wpEval(
-    "SucuriScanOption::updateOption(':twofactor_mode','disabled');" +
-      "SucuriScanOption::updateOption(':twofactor_users',array());" +
-      '$users=get_users(array("fields"=>"ID"));foreach($users as $uid){' +
-      "delete_user_meta($uid,'sucuriscan_topt_secret_key');" +
-      "delete_user_meta($uid,'sucuriscan_topt_last_success');}" +
-      'global $wpdb;' +
-      '$wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE \'_transient_sucuri_2fa_%\' OR option_name LIKE \'_transient_timeout_sucuri_2fa_%\'");' +
-      `foreach(array(${JSON.stringify(testAdminUser.login)},${JSON.stringify(extraUser.login)}) as $login){` +
-      '$user=get_user_by("login",$login);if($user){WP_Session_Tokens::get_instance($user->ID)->destroy_all();}}',
-  );
-}
+/** Sessions destroyed by every reset — the named users these tests log in as. */
+const SESSION_RESET_LOGINS = [testAdminUser.login, extraUser.login] as const;
+
+/** Number of subscribers the bulk-policy tests need in the users table. */
+const BULK_USER_COUNT = 60;
 
 function ensureBulkUsers(): void {
-  createdBulkUsers = JSON.parse(
-    wpEval(
-      '$created=array();' +
-        'for($i=1;$i<=60;$i++){$login=sprintf("bulkuser-%03d",$i);' +
-        '$user=get_user_by("login",$login);if(!$user){wp_insert_user(array(' +
-        '"user_login"=>$login,"user_email"=>$login."@sucuri.net",' +
-        '"user_pass"=>"password","role"=>"subscriber"));$user=get_user_by("login",$login);$created[]=$user->ID;}}' +
-        'echo wp_json_encode($created);',
-    ),
-  ) as number[];
+  createdBulkUsers = createBulkUsers(BULK_USER_COUNT);
 }
 
 /**
@@ -160,16 +140,14 @@ test.describe("Two-Factor Authentication", () => {
     pluginData = snapshotPluginData();
     userMeta = snapshotAllUserMeta(USER_META_KEYS);
     loginTransients = snapshotRawOptionsByPrefix(TRANSIENT_PREFIXES);
-    resetTwoFactorState();
+    resetTwoFactorState(SESSION_RESET_LOGINS);
   });
 
   // ALWAYS-RUNS safety net: fully reset 2FA after every test so the shared admin
   // (id 1) is never left locked behind a challenge for the next test/spec.
   test.afterEach(() => {
     if (createdBulkUsers.length) {
-      wpEval(
-        `foreach(array(${createdBulkUsers.join(",")}) as $uid){wp_delete_user($uid);}`,
-      );
+      deleteUsers(createdBulkUsers);
     }
     restorePluginData(pluginData);
     restoreAllUserMeta(userMeta, USER_META_KEYS);

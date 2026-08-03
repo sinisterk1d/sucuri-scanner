@@ -19,9 +19,9 @@ import {
   restoreCron,
   snapshotCron,
   updateOption,
-  wpEval,
   type CronSnapshot,
 } from "../../support/wp-cli";
+import { writeIntegrityDatastore } from "../../support/settings-general";
 
 const GENERAL_URL = "/wp-admin/admin.php?page=sucuriscan_settings#general";
 
@@ -104,11 +104,7 @@ test.describe("Settings · General", () => {
   });
 
   test("deletes datastore files", async ({ page }) => {
-    wpEval(
-      '$f=SucuriScan::dataStorePath("sucuri-integrity.php");$d=dirname($f);' +
-        'if(!is_dir($d)){mkdir($d,0755,true);}' +
-        'file_put_contents($f,"<?php exit(0); ?>\\n[]\\n");',
-    );
+    writeIntegrityDatastore();
     await page.goto(GENERAL_URL);
 
     // Exactly one writable file selected -> "1 out of 1".

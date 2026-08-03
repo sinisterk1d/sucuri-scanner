@@ -4,6 +4,10 @@
  *
  * `loggedOutRequest` is an unauthenticated APIRequestContext used by the header
  * and hardening specs to assert responses as an anonymous visitor.
+ *
+ * `cacheControlContent` is the published post/page/category the Cache-Control
+ * spec reads headers from. It is worker-scoped and lazy: only a test that names
+ * it pays for the seed, and the content is removed when the worker exits.
  */
 import {
   test as base,
@@ -13,6 +17,11 @@ import {
 import net from "node:net";
 import path from "node:path";
 import { BASE_URL } from "./env";
+import {
+  seedCacheControlContent,
+  teardownCacheControlContent,
+  type CacheControlContent,
+} from "./cache-control";
 import { restorePluginData, snapshotPluginData } from "./wp-cli";
 
 interface Fixtures {
@@ -23,6 +32,7 @@ interface Fixtures {
 
 interface WorkerFixtures {
   sharedEnvironmentLock: void;
+  cacheControlContent: CacheControlContent;
 }
 
 function lockPort(): number {
@@ -89,6 +99,18 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
     await use(context);
     await context.dispose();
   },
+  // Seeded once per worker rather than per file: Playwright has no file scope,
+  // and re-creating three posts around every test would cost two extra wp-env
+  // round-trips each time. The seed sweeps its own leftovers by meta marker, so
+  // a crashed run cannot leave duplicates for the next one.
+  cacheControlContent: [
+    async ({}, use) => {
+      const content = seedCacheControlContent();
+      await use(content);
+      teardownCacheControlContent();
+    },
+    { scope: "worker" },
+  ],
 });
 
 export { expect } from "@playwright/test";

@@ -23,17 +23,30 @@ import {
   snapshotCron,
   snapshotWpFiles,
   updateOption,
-  wpEval,
   type CronSnapshot,
   type FileSnapshot,
 } from "../../support/wp-cli";
+import {
+  clearScannerDataStores,
+  seedScannerFixtures,
+} from "../../support/scanner";
 
 const DASHBOARD_URL = "/wp-admin/admin.php?page=sucuriscan";
 const SCANNER_URL = "/wp-admin/admin.php?page=sucuriscan_settings#scanner";
 
+/**
+ * Single source of truth for the seeded baseline: the same count drives both the
+ * snapshot/restore list below and the files tests/e2e-seed-scanner.sh creates,
+ * so the two can never drift apart.
+ */
+const SCANNER_TEST_FILE_COUNT = 100;
+
 const SCANNER_FIXTURES = [
   "wp-config-test.php",
-  ...Array.from({ length: 100 }, (_, index) => `wp-test-file-${index + 1}.php`),
+  ...Array.from(
+    { length: SCANNER_TEST_FILE_COUNT },
+    (_, index) => `wp-test-file-${index + 1}.php`,
+  ),
 ];
 
 /**
@@ -105,19 +118,6 @@ async function confirmAndSubmitIntegrity(page: Page): Promise<void> {
   await submit.click();
 }
 
-/**
- * Reset the shared scanner state so each test starts from the seeded baseline:
- * delete the integrity false-positive cache and the ignore-scanning data store
- * (the plugin recreates them empty on next access). Restores the 105-file
- * dashboard count and an empty ignore list.
- */
-function clearScannerDataStores(): void {
-  wpEval(
-    '@unlink(SucuriScan::dataStorePath("sucuri-integrity.php"));' +
-      '@unlink(SucuriScan::dataStorePath("sucuri-ignorescanning.php"));',
-  );
-}
-
 test.describe("Scanner", () => {
   let originalFiles: FileSnapshot;
   let originalPluginCron: CronSnapshot[];
@@ -133,12 +133,7 @@ test.describe("Scanner", () => {
     // The dashboard only renders the clickable integrity rows (and the toggle
     // test only starts "disabled") when this option is enabled at page load.
     updateOption("sucuriscan_diff_utility", "enabled");
-    wpEval(
-      'touch(ABSPATH."wp-config-test.php");' +
-        'for($i=1;$i<=100;$i++){touch(ABSPATH."wp-test-file-".$i.".php");}' +
-        'wp_clear_scheduled_hook("wp_update_plugins");' +
-        'wp_schedule_event(time()+3600,"twicedaily","wp_update_plugins");',
-    );
+    seedScannerFixtures(SCANNER_TEST_FILE_COUNT);
   });
 
   test.afterEach(() => {
