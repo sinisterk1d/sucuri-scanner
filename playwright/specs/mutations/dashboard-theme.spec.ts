@@ -99,7 +99,9 @@ test.describe("Dashboard theme gating", () => {
     restoreUserMeta(adminUser.login, "sucuriscan_preferred_theme", theme);
   });
 
-  test("Test Light Theme", async ({ page }) => {
+  test("renders the freemium dashboard when no WAF key is stored", async ({
+    page,
+  }) => {
     // Freemium baseline: no valid WAF key stored.
     await page.goto(DASHBOARD_URL);
 
@@ -118,7 +120,9 @@ test.describe("Dashboard theme gating", () => {
     await expect(themeBodies.last()).not.toBeVisible();
   });
 
-  test("Test Dark Theme", async ({ page }) => {
+  test("renders the premium dashboard once a WAF key is saved", async ({
+    page,
+  }) => {
     await stubExternalAjax(page);
     await page.goto(FIREWALL_URL);
 

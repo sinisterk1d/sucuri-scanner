@@ -368,7 +368,7 @@ test("treats regex characters in allowlisted paths literally", async ({
   );
 });
 
-test("Can add and remove multiple files from the allowlist of blocked PHP files", async ({
+test("can add and remove multiple files from the allowlist of blocked PHP files", async ({
   page,
 }) => {
   await page.goto(HARDENING_URL);

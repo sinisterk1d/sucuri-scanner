@@ -53,7 +53,7 @@ test.describe("Headers · Content-Security-Policy", () => {
     deleteOption("sucuriscan_headers_csp_options");
   });
 
-  test("Toggling enforce checkbox enables/disables inputs interactively", async ({
+  test("toggling the enforce checkbox enables and disables its directive input", async ({
     page,
   }) => {
     await page.goto(HEADERS_URL);
@@ -75,7 +75,7 @@ test.describe("Headers · Content-Security-Policy", () => {
     await expect(value).toBeDisabled();
   });
 
-  test("Saves enforced state and value changes and persists after reload", async ({
+  test("saves enforced state and directive values, and persists them after reload", async ({
     page,
     loggedOutRequest,
   }) => {
@@ -112,7 +112,7 @@ test.describe("Headers · Content-Security-Policy", () => {
     await expectHeaderAbsent(loggedOutRequest, "/", CSP_HEADER);
   });
 
-  test("Test multi_checkbox directive (sandbox)", async ({
+  test("emits sandbox tokens in declaration order and updates them when the selection changes", async ({
     page,
     loggedOutRequest,
   }) => {
@@ -176,7 +176,7 @@ test.describe("Headers · Content-Security-Policy", () => {
     );
   });
 
-  test("Upgrade Insecure Requests directive should not appear unless enforced", async ({
+  test("omits the Upgrade Insecure Requests directive unless it is enforced", async ({
     page,
     loggedOutRequest,
   }) => {

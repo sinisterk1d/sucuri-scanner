@@ -113,7 +113,7 @@ test.describe("Headers · CORS", () => {
     );
   });
 
-  test("Allow-Methods multi-checkbox (GET/POST/OPTIONS) works correctly", async ({
+  test("saves and emits the Allow-Methods selection (GET/POST/OPTIONS)", async ({
     page,
     loggedOutRequest,
   }) => {
