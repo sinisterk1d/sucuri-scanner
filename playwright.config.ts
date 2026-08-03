@@ -47,6 +47,13 @@ export default defineConfig({
   },
 
   projects: [
+    // Pure-logic tests over the support helpers. No browser, no wp-env, and no
+    // dependency on `setup` — so they still run when Docker is down, which is
+    // the point: the code they cover decides what a failure message may reveal.
+    {
+      name: "unit",
+      testDir: "./playwright/specs/unit",
+    },
     {
       name: "setup",
       testDir: "./playwright/support",

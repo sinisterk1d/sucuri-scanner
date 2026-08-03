@@ -38,7 +38,7 @@ import {
   snapshotAllUserMeta,
   snapshotPluginData,
   snapshotRawOptionsByPrefix,
-  type AllUserMetaSnapshot,
+  type AllUserMetaSnapshotPath,
   type PluginDataSnapshot,
   type RawOptionSnapshot,
 } from "../../support/wp-cli";
@@ -59,7 +59,7 @@ const TWO_FACTOR_USER_CHECKBOX =
   'input[name="sucuriscan_twofactor_users[]"]';
 let pluginData: PluginDataSnapshot;
 let createdBulkUsers: number[] = [];
-let userMeta: AllUserMetaSnapshot;
+let userMeta: AllUserMetaSnapshotPath;
 let loginTransients: Map<string, RawOptionSnapshot | null>;
 const TRANSIENT_PREFIXES = [
   "_transient_sucuri_2fa_",
