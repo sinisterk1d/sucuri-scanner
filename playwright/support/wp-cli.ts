@@ -13,6 +13,36 @@ import { PLUGIN_SLUG } from "./env";
 
 const MAX_BUFFER = 8 * 1024 * 1024;
 const WP_ENV_BIN = path.resolve("node_modules/.bin/wp-env");
+const STDERR_LIMIT = 2000;
+
+/**
+ * Secret shapes that can appear in a failed command's argv or stderr. A failure
+ * message is worth nothing if it cannot be printed, and this suite runs in CI
+ * where output is retained — so the diagnostic is kept and the secrets are
+ * masked, rather than the whole message being dropped.
+ *
+ * Ordered: the WAF key must match before the generic hex rule, or the two
+ * halves of `<32hex>/<32hex>` would be masked separately and the slash left
+ * looking like real structure.
+ */
+const SECRET_PATTERNS: ReadonlyArray<readonly [RegExp, string]> = [
+  // Firewall API key — SucuriScanAPI::isValidKey, ^[a-z0-9]{32}/[a-z0-9]{32}$.
+  [/\b[a-z0-9]{32}\/[a-z0-9]{32}\b/gi, "<waf-key>"],
+  // SUCURI_PLUG_KEY / SUCURI_PLUG_SALT (64 hex) and WordPress salts.
+  [/\b[0-9a-f]{32,}\b/gi, "<hex-secret>"],
+  // TOTP shared secrets are base32.
+  [/\b[A-Z2-7]{16,}={0,6}\b/g, "<base32-secret>"],
+  // `wp user create/update --user_pass=…`.
+  [/(--user_pass=)\S+/g, "$1<redacted>"],
+];
+
+/** Mask credential-shaped substrings so a failure can be logged safely. */
+export function redactSecrets(text: string): string {
+  return SECRET_PATTERNS.reduce(
+    (masked, [pattern, replacement]) => masked.replace(pattern, replacement),
+    text,
+  );
+}
 
 export type FileSnapshot = Record<string, string | null>;
 
@@ -29,7 +59,16 @@ export interface CronSnapshot {
   args: unknown[];
 }
 
-export type AllUserMetaSnapshot = string;
+/**
+ * Path to a serialized snapshot file inside the container, not the data itself.
+ *
+ * Every-user metadata is large enough that returning it through stdout would
+ * risk the 8 MB maxBuffer that bounds wpEnvRun, so it goes to a temp file and
+ * only the path crosses back. restoreAllUserMeta unlinks it; a test that dies
+ * between the two leaks one file into the container's /tmp, which is acceptable
+ * for a disposable wp-env and is why nothing here tries to be clever about it.
+ */
+export type AllUserMetaSnapshotPath = string;
 
 export interface RawOptionSnapshot {
   value: string;
@@ -45,9 +84,15 @@ export function wpEnvRun(...command: string[]): string {
       stdio: ["ignore", "pipe", "pipe"],
     }).trim();
   } catch (error) {
-    const err = error as { status?: number };
+    const err = error as { status?: number; stderr?: string | Buffer };
+    const exit = err.status !== undefined ? ` (exit ${err.status})` : "";
+    // Redact before truncating: once the whole string is masked, any slice of
+    // it is safe, whereas truncating first could split a secret across the cut
+    // and leave the surviving half unmatched.
+    const stderr = redactSecrets(String(err.stderr ?? "")).trim();
+    const tail = stderr ? `\n${stderr.slice(-STDERR_LIMIT)}` : "";
     throw new Error(
-      `wp-env command failed${err.status !== undefined ? ` (exit ${err.status})` : ""}`,
+      `wp-env command failed${exit}: ${redactSecrets(command.join(" "))}${tail}`,
     );
   }
 }
@@ -73,7 +118,11 @@ export function runPluginScript(
   );
 }
 
-/** Read a wp_option. Returns the parsed JSON when possible, else the trimmed raw string, else null. */
+/**
+ * Read a wp_option, parsed as JSON when possible and returned as a trimmed
+ * string otherwise. Throws for an option that does not exist — `wp option get`
+ * exits non-zero — so use tryGetOption when absence is an expected outcome.
+ */
 export function getOption<T = unknown>(name: string): T | string | null {
   const raw = wp("option", "get", name, "--format=json");
   if (!raw) return null;
@@ -188,55 +237,31 @@ export function restoreWpConfig(content: string): void {
   );
 }
 
-/** Snapshot the configured plugin datastore directory with metadata preserved. */
+const DATASTORE_SCRIPT = "tests/e2e-snapshot-datastore.sh";
+
+/**
+ * Copy the plugin datastore directory aside so a test's writes can be undone.
+ *
+ * The plugin keeps every sucuriscan_* option in sucuri-settings.php inside that
+ * directory rather than in wp_options, so this is the suite's only general undo
+ * for plugin state. The path guard, and the list of entries treated as the
+ * plugin's, live in tests/e2e-snapshot-datastore.sh.
+ *
+ * Pass `loadPlugin: false` when the plugin may not be active yet (global setup);
+ * the path is then resolved from SUCURI_DATA_STORAGE / WP_CONTENT_DIR rather
+ * than by calling SucuriScan::dataStorePath().
+ */
 export function snapshotPluginData(loadPlugin = true): PluginDataSnapshot {
-  const info = JSON.parse(
-    (loadPlugin ? wpEval : (php: string) => wp("eval", php, "--skip-plugins", "--skip-themes"))(
-      (loadPlugin
-        ? '$raw=SucuriScan::dataStorePath();'
-        : '$raw=defined("SUCURI_DATA_STORAGE")?SUCURI_DATA_STORAGE:WP_CONTENT_DIR."/uploads/sucuri";') +
-        '$parent=realpath(dirname($raw));' +
-        '$path=$parent?$parent."/".basename($raw):$raw;echo wp_json_encode(array(' +
-        '"path"=>$path,"unsafe"=>array(rtrim(ABSPATH,"/"),rtrim(WP_CONTENT_DIR,"/"),rtrim(WP_PLUGIN_DIR,"/"),rtrim(dirname(ABSPATH),"/")),"symlink"=>is_link($path)));',
-    ),
-  ) as { path: string; unsafe: string[]; symlink: boolean };
-  const dataPath = info.path.replace(/\/+$/, "");
-  if (
-    !dataPath.startsWith("/") ||
-    dataPath === "/" ||
-    info.unsafe.includes(dataPath) ||
-    info.symlink
-  ) {
-    throw new Error(`Unsafe plugin datastore path: ${dataPath}`);
-  }
-  const backupPath = wpEnvRun(
-    "mktemp",
-    "-d",
-    "/tmp/sucuri-playwright-data.XXXXXX",
-  );
-  const existed = wpEval(
-    `echo is_dir(${JSON.stringify(dataPath)})?"yes":"no";`,
-  ) === "yes";
-  if (existed) {
-    wpEnvRun(
-      "sh",
-      "-c",
-      'mkdir -p "$2/data"; for f in "$1"/sucuri-* "$1"/.htaccess "$1"/index.html; do [ ! -e "$f" ] || cp -a "$f" "$2/data/"; done',
-      "sucuri-snapshot",
-      dataPath,
-      backupPath,
-    );
-  }
-  return { backupPath, dataPath, existed };
+  return JSON.parse(
+    runPluginScript(DATASTORE_SCRIPT, "snapshot", loadPlugin ? "yes" : "no"),
+  ) as PluginDataSnapshot;
 }
 
-/** Restore the configured plugin datastore directory and remove its backup. */
+/** Restore the datastore directory from a snapshot and delete the backup. */
 export function restorePluginData(snapshot: PluginDataSnapshot): void {
-  wpEnvRun(
-    "sh",
-    "-c",
-    'set -e; parent=$(dirname "$1"); stage="$parent/.sucuri-data-restore.$$"; rm -rf "$stage"; if [ "$3" = yes ]; then mkdir -p "$stage"; for f in "$2/data"/* "$2/data"/.htaccess; do [ ! -e "$f" ] || cp -a "$f" "$stage/"; done; fi; if [ -d "$1" ]; then for f in "$1"/sucuri-* "$1"/.htaccess "$1"/index.html; do [ ! -e "$f" ] || rm -rf "$f"; done; fi; if [ "$3" = yes ]; then mkdir -p "$1"; for f in "$stage"/* "$stage"/.htaccess; do [ ! -e "$f" ] || mv "$f" "$1/"; done; else rmdir "$1" 2>/dev/null || true; fi; rm -rf "$stage" "$2"',
-    "sucuri-restore",
+  runPluginScript(
+    DATASTORE_SCRIPT,
+    "restore",
     snapshot.dataPath,
     snapshot.backupPath,
     snapshot.existed ? "yes" : "no",
@@ -407,7 +432,7 @@ export function restoreSerializedUserMeta(
 /** Snapshot selected serialized metadata keys for every existing user. */
 export function snapshotAllUserMeta(
   keys: readonly string[],
-): AllUserMetaSnapshot {
+): AllUserMetaSnapshotPath {
   const encoded = Buffer.from(JSON.stringify(keys)).toString("base64");
   const output = wpEval(
     `$keys=json_decode(base64_decode("${encoded}"),true);$out=array();` +
@@ -420,7 +445,7 @@ export function snapshotAllUserMeta(
 
 /** Restore selected user metadata keys for all users captured in a snapshot. */
 export function restoreAllUserMeta(
-  snapshot: AllUserMetaSnapshot,
+  snapshot: AllUserMetaSnapshotPath,
   keys: readonly string[],
 ): void {
   const keysEncoded = Buffer.from(JSON.stringify(keys)).toString("base64");
@@ -438,22 +463,6 @@ export function deleteRawOption(name: string): void {
   wp(
     "eval",
     `delete_option(${JSON.stringify(name)});`,
-    "--skip-plugins",
-    "--skip-themes",
-  );
-}
-
-/** Update a raw wp_option without loading active plugins. */
-export function updateRawOption(
-  name: string,
-  value: unknown,
-  autoload = "no",
-): void {
-  const encoded = Buffer.from(JSON.stringify(value)).toString("base64");
-  wp(
-    "eval",
-    `$name=${JSON.stringify(name)};$value=json_decode(base64_decode("${encoded}"),true);` +
-      `add_option($name,$value,"",${JSON.stringify(autoload)});`,
     "--skip-plugins",
     "--skip-themes",
   );
@@ -506,6 +515,10 @@ export function ensureUser(
   }
 }
 
+// Never invalidated: logins here are the fixed users from support/env.ts, which
+// global setup repairs rather than recreates, so an ID cannot change under us.
+// A spec that deletes and recreates one of them would read a stale ID and fail
+// somewhere far away — clear this map if that day comes.
 const userIdCache = new Map<string, number>();
 
 /**

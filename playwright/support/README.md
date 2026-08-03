@@ -10,16 +10,22 @@ playwright.config.ts          # projects, testIdAttribute='data-cy', timeouts
 playwright/
   support/                    # shared helpers + fixtures (this dir)
     env.ts                    # users, URLs, cookie/option names, plugin slug
-    fixtures.ts               # extended `test` (adds `loggedOutRequest`)
+    fixtures.ts               # extended `test` (`loggedOutRequest`, `cacheControlContent`)
     auth.ts                   # login / submitLogin / addWafDismissCookie
     notices.ts                # expectNotice / notice / expectNoErrorNotice
     http.ts                   # response-header / 403 / 200 assertions
+    audit-logs.ts             # typed seam over tests/e2e-seed-audit-logs.sh
+    cache-control.ts          # typed seam over tests/e2e-seed-cache-control.sh
+    scanner.ts                # typed seam over tests/e2e-seed-scanner.sh
+    settings-general.ts       # typed seam over tests/e2e-seed-settings-general.sh
+    two-factor-state.ts       # typed seam over tests/e2e-seed-two-factor.sh
     wp-cli.ts                 # wp-env tests-cli helpers (options, eval, seeds)
     totp.ts                   # RFC-6238 TOTP generator (2FA)
     pages/two-factor.page.ts  # 2FA admin page object + login-challenge helpers
     global.setup.ts           # `setup` project: provision users + admin storageState
   data/                       # JSON fixtures (audit logs)
   specs/
+    unit/                     # pure logic, no browser/wp-env -> project "unit"
     features/                 # disjoint, non-destructive  -> project "features"
     mutations/                # global-destructive / auth-affecting -> project "mutations"
 ```
@@ -32,6 +38,9 @@ does not run every feature test first.
 instance, so in-process parallelism is unsafe. Each CI matrix entry uses its own
 isolated wp-env.
 
+- **unit/**: pure functions from `support/`. No browser, no `setup` dependency,
+  no Docker — these run even when wp-env is down. Keep them that way; anything
+  that needs WordPress belongs in one of the two projects below.
 - **features/**: touch a disjoint slice of state, no global wipe, no auth change.
 - **mutations/**: wipe/overwrite many options, change auth/2FA/passwords/keys,
   toggle the plugin, or need a dedicated seed.
@@ -54,6 +63,24 @@ isolated wp-env.
   `http.ts` helpers. For logged-in checks pass the authenticated `request` fixture.
 - **No browser artifacts**: traces, screenshots, videos, HTML reports, and
   failure snapshots can expose credentials, TOTP secrets, or WordPress salts.
+- **WP-side setup**: `wpEval()` is for a single self-contained statement. Anything
+  multi-statement, or that would splice a JS value into PHP source, belongs in a
+  `tests/e2e-seed-*.sh` script reached through `runPluginScript()` — with values
+  passed in the environment and read with `getenv()`. The PHP stays readable and
+  reviewable instead of turning into escaped string concatenation, and it keeps
+  working when the same fixture is needed from `tests/e2e-prepare.sh` too. See
+  `tests/e2e-corrupt-salt.sh` for the original statement of the rule.
+  **Exception:** the generic snapshot/restore helpers in `wp-cli.ts` build
+  multi-statement PHP inline and stay that way. They take arbitrary arguments
+  rather than seeding a fixed fixture, and every value crosses the boundary as
+  `JSON.stringify()` or a base64 payload, so nothing is spliced into PHP source.
+  Converting them would mean inventing a JSON protocol per helper for no gain.
+  The rule is about splicing and readability, not about the word "multi-statement".
+- **Destructive shell**: anything that deletes or moves files runs from a script
+  under `tests/`, not an inline `sh -c`. `tests/e2e-snapshot-datastore.sh` is the
+  model: the path guard is written once, re-checked before the delete rather than
+  only at capture time, and the whole operation is one `wp-env run` instead of
+  four — which matters when it wraps all 79 tests.
 - **Idempotency**: the shared fixture snapshots/restores `uploads/sucuri` around
   every test. Specs must additionally own `wp-config.php`, cron, users/posts, and
   files outside that directory through the helpers below.
@@ -65,8 +92,14 @@ isolated wp-env.
 ## Helper quick-reference
 
 ```ts
-import { test, expect } from '../../support/fixtures';      // gives `loggedOutRequest`
+import { test, expect } from '../../support/fixtures';      // gives `loggedOutRequest`, `cacheControlContent`
 // or: import { test, expect } from '@playwright/test';      // when no extra fixture needed
+
+import { seedAuditQueue } from '../../support/audit-logs';
+import { quarantineFuturePosts, restoreFuturePosts } from '../../support/cache-control';
+import { clearScannerDataStores, seedScannerFixtures } from '../../support/scanner';
+import { writeIntegrityDatastore } from '../../support/settings-general';
+import { resetTwoFactorState, createBulkUsers, deleteUsers } from '../../support/two-factor-state';
 
 import { expectNotice, expectNoErrorNotice } from '../../support/notices';
 import { login, submitLogin, addWafDismissCookie } from '../../support/auth';
@@ -97,6 +130,7 @@ idempotent destructive flows) as canonical examples.
 ```bash
 make e2e                         # preserve environment, run everything
 make e2e-reset                   # destructive tests-DB reset + canonical seed
+npm run test:e2e -- --project=unit     # pure logic, no Docker needed
 npm run test:e2e -- --project=features --grep='header'
 npm run test:e2e -- --project=mutations --grep='password'
 npm run test:e2e:setup           # refresh auth before --no-deps/UI debugging
