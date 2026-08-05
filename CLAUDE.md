@@ -20,11 +20,12 @@ Every rule in this file about compatibility, testing, and review exists because 
 - **Stack:** PHP (no framework, no runtime autoloader, no Composer classes shipped) + vanilla
   JS/CSS in `inc/`. Data lives in WordPress options and in flat PHP datastore files. TypeScript is
   dev-only, for the Playwright E2E suite.
-- **PHP support:** PHP **7.4** is the floor (E2E CI matrix runs 7.4 and 8.0; unit CI runs 8.5). Code
+- **PHP support:** PHP **7.4** is the floor, declared in `composer.json` (`"php": ">=7.4"`) and in
+  `readme.txt` (`Requires PHP: 7.4`). E2E CI runs 7.4 and 8.0; unit CI runs 7.4 and 8.5. Code
   must parse and run on 7.4 — no typed properties with union types, no `match`, no enums, no
   constructor promotion, no first-class callable syntax, no nullsafe chains beyond `?->` (which is
   8.0+, so also out). Prefer the conservative construct.
-- **WordPress support:** `readme.txt` claims `Requires at least: 3.6`, tested to 7.0. Do not reach
+- **WordPress support:** `readme.txt` declares `Requires at least: 6.0`, tested to 7.0. Do not reach
   for a WP API newer than what the plugin already uses without checking when it landed and
   guarding with `function_exists()`.
 - **Layout:**
