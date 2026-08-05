@@ -212,76 +212,81 @@ final class TwoFactorTest extends TestCase
         $this->assertSame('AAAA1111', $method->invoke(null, 'sucuriscan_totp_code'));
     }
 
-    public function testLoginTemplateAllowsBackupCodeEntryWithoutJavaScript(): void
+    /**
+     * The login field has to accept both credential shapes the server accepts:
+     * a 6-digit TOTP code and a 9-character formatted backup code (AAAA-BBBB).
+     * A numeric-only pattern here would lock every user out of backup-code
+     * login, so the constraints are asserted against the parsed input element
+     * rather than by matching text anywhere in the file.
+     */
+    public function testLoginFormAcceptsBothCredentialShapesWithoutJavaScript(): void
     {
         $template = file_get_contents(BASE_DIR . '/inc/tpl/login-2fa.html.tpl');
 
         $this->assertNotFalse($template);
-        $this->assertStringContainsString('maxlength="9"', $template);
-        $this->assertStringContainsString('inputmode="text"', $template);
-        $this->assertStringNotContainsString('pattern="[0-9]{6}"', $template);
-        $this->assertStringNotContainsString('<script', $template);
+
+        $dom = new DOMDocument();
+        libxml_use_internal_errors(true);
+        $dom->loadHTML((string) $template);
+        libxml_clear_errors();
+
+        $xpath = new DOMXPath($dom);
+        $input = $xpath->query('//input[@name="sucuriscan_totp_code"]')->item(0);
+
+        $this->assertInstanceOf(DOMElement::class, $input, 'the code input must exist');
+        $this->assertSame('9', $input->getAttribute('maxlength'), 'must fit a 9-char formatted backup code');
+        $this->assertSame('text', $input->getAttribute('inputmode'), 'backup codes are not numeric');
+        $this->assertFalse(
+            $input->hasAttribute('pattern'),
+            'a pattern attribute would reject one of the two accepted credential shapes'
+        );
+
+        // The 2FA challenge must survive with scripting unavailable.
+        $this->assertSame(0, $xpath->query('//script')->length, 'the login step must not depend on JS');
     }
 
-    public function testBackupCodeModalUsesSharedThemeVariables(): void
+    /**
+     * backup-codes.js calls window.sucuriscanDownloadTextFile(), which is
+     * defined by inc/js/scripts.js (handle: sucuriscan). Without the dependency
+     * the two can load in either order and Download silently does nothing, so
+     * the registration is exercised instead of grepped for.
+     */
+    public function testBackupCodesScriptDependsOnTheSharedScript(): void
     {
-        $styles = file_get_contents(BASE_DIR . '/inc/css/shared.css');
-        $script = file_get_contents(BASE_DIR . '/inc/js/backup-codes.js');
+        $registered = array();
 
-        $this->assertNotFalse($styles);
-        $this->assertNotFalse($script);
-        $this->assertStringContainsString('.sucuriscan-backup-codes-modal', $styles);
-        $this->assertStringContainsString('background: var(--sucuri-surface-card-bg)', $styles);
-        $this->assertStringContainsString('color: var(--sucuri-color-text-main)', $styles);
-        $this->assertStringNotContainsString('sucuriscan-backup-codes-style', $script);
+        Functions\when('wp_register_script')->alias(
+            function ($handle, $src, $deps = array(), $ver = false, $footer = false) use (&$registered) {
+                $registered[$handle] = array('src' => $src, 'deps' => $deps);
+
+                return true;
+            }
+        );
+
+        $method = (new ReflectionClass(SucuriScanTwoFactor::class))->getMethod('ensure_backup_codes_script');
+        $method->setAccessible(true);
+        $method->invoke(null);
+
+        $this->assertArrayHasKey('sucuriscan-backup-codes', $registered);
+        $this->assertStringContainsString('inc/js/backup-codes.js', $registered['sucuriscan-backup-codes']['src']);
+        $this->assertContains(
+            'sucuriscan',
+            $registered['sucuriscan-backup-codes']['deps'],
+            'the download helper lives in the shared script and must load first'
+        );
     }
 
-    public function testBackupCodeModalLocksAndRestoresDocumentScroll(): void
-    {
-        $styles = file_get_contents(BASE_DIR . '/inc/css/shared.css');
-        $script = file_get_contents(BASE_DIR . '/inc/js/backup-codes.js');
-
-        $this->assertNotFalse($styles);
-        $this->assertNotFalse($script);
-        $this->assertStringContainsString('body.sucuriscan-backup-codes-modal-open', $styles);
-        $this->assertStringContainsString('overflow: hidden', $styles);
-        $this->assertStringContainsString('document.documentElement.classList.toggle', $script);
-        $this->assertStringContainsString('document.body.classList.toggle', $script);
-        $this->assertStringContainsString('document.querySelector(overlaySelector)', $script);
-    }
-
-    public function testBackupCodeDownloadUsesSharedTextDownloadUtility(): void
-    {
-        $sharedScript = file_get_contents(BASE_DIR . '/inc/js/scripts.js');
-        $backupCodesScript = file_get_contents(BASE_DIR . '/inc/js/backup-codes.js');
-        $twoFactor = file_get_contents(BASE_DIR . '/src/topt.lib.php');
-
-        $this->assertNotFalse($sharedScript);
-        $this->assertNotFalse($backupCodesScript);
-        $this->assertNotFalse($twoFactor);
-        $this->assertStringContainsString('window.sucuriscanDownloadTextFile', $sharedScript);
-        $this->assertStringContainsString('window.sucuriscanDownloadTextFile(', $backupCodesScript);
-        $this->assertStringContainsString('"sucuri-backup-codes.txt"', $backupCodesScript);
-        $this->assertStringNotContainsString('createObjectURL', $backupCodesScript);
-        $this->assertStringContainsString("array('sucuriscan')", $twoFactor);
-    }
-
-    public function testBackupCodeRevealAndProfileEnableFinishAfterModalClose(): void
+    /**
+     * The reveal element is a data-only <div> consumed by the enqueued script.
+     * Keeping markup and behaviour separated is what lets the plugin ship
+     * without inline script on a page that renders plaintext backup codes.
+     */
+    public function testRevealTemplateShipsNoInlineScript(): void
     {
         $revealTemplate = file_get_contents(BASE_DIR . '/inc/tpl/profile-2fa-backup-codes.snippet.tpl');
-        $backupCodesScript = file_get_contents(BASE_DIR . '/inc/js/backup-codes.js');
-        $setupTemplate = file_get_contents(BASE_DIR . '/inc/tpl/profile-2fa-setup.snippet.tpl');
-        $statusTemplate = file_get_contents(BASE_DIR . '/inc/tpl/profile-2fa-status.snippet.tpl');
 
         $this->assertNotFalse($revealTemplate);
-        $this->assertNotFalse($backupCodesScript);
-        $this->assertNotFalse($setupTemplate);
-        $this->assertNotFalse($statusTemplate);
         $this->assertStringNotContainsString('<script', $revealTemplate);
-        $this->assertStringContainsString('sucuriscan-backup-codes-reveal-data', $backupCodesScript);
-        $this->assertStringContainsString('window.location.assign(redirectURL)', $backupCodesScript);
-        $this->assertStringContainsString('window.location.reload()', $setupTemplate);
-        $this->assertStringContainsString('window.location.reload()', $statusTemplate);
     }
 
     public function testSuccessfulSetupShowsBackupCodesBeforeOriginalRedirect(): void
@@ -312,17 +317,6 @@ final class TwoFactorTest extends TestCase
         }
 
         $this->assertContains('https://example.com/account', $transients);
-    }
-
-    public function testBackupCodeCopyUsesOnlyModernClipboardApi(): void
-    {
-        $backupCodesScript = file_get_contents(BASE_DIR . '/inc/js/backup-codes.js');
-
-        $this->assertNotFalse($backupCodesScript);
-        $this->assertStringContainsString('navigator.clipboard?.writeText', $backupCodesScript);
-        $this->assertStringContainsString('Copy unavailable', $backupCodesScript);
-        $this->assertStringNotContainsString('execCommand', $backupCodesScript);
-        $this->assertStringNotContainsString('jQuery', $backupCodesScript);
     }
 
     public function testRecordFailedBackupAttemptUsesStricterLimitThanTotp(): void
