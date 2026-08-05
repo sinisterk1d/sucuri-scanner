@@ -29,6 +29,15 @@ const SECRET_CODE = "code.sucuriscan-2fa-secret-code";
 const TOTP_INPUT = "#sucuriscan-totp-code";
 const TOTP_SUBMIT = "#sucuriscan-totp-submit";
 
+/**
+ * The one-time backup-codes reveal, built entirely in JS by inc/js/backup-codes.js
+ * (there is no server-rendered markup to hang a data-cy on — the template ships a
+ * hidden data carrier and the script constructs the dialog from it), so these are
+ * class selectors by necessity.
+ */
+const BACKUP_CODES_OVERLAY = ".sucuriscan-backup-codes-overlay";
+const BACKUP_CODE_VALUE = `${BACKUP_CODES_OVERLAY} .sucuriscan-backup-codes-list li code`;
+
 export class TwoFactorAdminPage {
   constructor(private readonly page: Page) {}
 
@@ -217,6 +226,13 @@ export async function finishWithCode(page: Page, code: string): Promise<void> {
 /**
  * Complete a first-time setup: read the secret, compute a valid code, submit it,
  * assert the user reaches wp-admin, and return the secret for later reuse.
+ *
+ * Enrolling also mints backup codes, and landing in wp-admin therefore raises the
+ * one-time reveal modal — an overlay that covers the page until it is
+ * acknowledged. It is dismissed here so every caller gets back the same usable
+ * wp-admin page it did before backup codes existed. The modal's own behaviour is
+ * asserted deliberately in specs/mutations/backup-codes.spec.ts; callers that
+ * need the codes should use completeSetupWithBackupCodes() instead.
  */
 export async function completeSetupWithGeneratedCode(
   page: Page,
@@ -226,5 +242,71 @@ export async function completeSetupWithGeneratedCode(
   expect(code).toMatch(/^\d{6}$/);
   await finishWithCode(page, code);
   await expect(page).toHaveURL(/\/wp-admin\//);
+  await dismissBackupCodesModalIfPresent(page);
   return secret;
+}
+
+/**
+ * Complete a first-time setup and also capture the backup codes revealed at the
+ * end of it.
+ *
+ * The reveal is the only moment the plaintext codes exist on the client — the
+ * server stores hashes and has no path that hands them back — so a test that
+ * wants to sign in with one has to take it from here.
+ */
+export async function completeSetupWithBackupCodes(
+  page: Page,
+): Promise<{ secret: string; codes: string[] }> {
+  const secret = await extractSecret(page);
+  const code = totp(secret);
+  expect(code).toMatch(/^\d{6}$/);
+  await finishWithCode(page, code);
+  await expect(page).toHaveURL(/\/wp-admin\//);
+
+  const codes = await readBackupCodesFromModal(page);
+  await dismissBackupCodesModal(page);
+
+  return { secret, codes };
+}
+
+/** Read the plaintext codes listed in the reveal modal. Fails if it is not open. */
+export async function readBackupCodesFromModal(page: Page): Promise<string[]> {
+  await expect(page.locator(BACKUP_CODES_OVERLAY)).toBeVisible();
+  const codes = await page.locator(BACKUP_CODE_VALUE).allInnerTexts();
+  return codes.map((code) => code.trim());
+}
+
+/**
+ * Acknowledge and close the reveal modal, and wait for it to leave the DOM.
+ *
+ * Ticking the checkbox is not optional: Close ships disabled and is only enabled
+ * by the change event, so clicking it first is a silent no-op. Closing may also
+ * navigate — the post-setup reveal carries a stashed redirect that backup-codes.js
+ * applies on close — which detaches the overlay just the same.
+ */
+export async function dismissBackupCodesModal(page: Page): Promise<void> {
+  const overlay = page.locator(BACKUP_CODES_OVERLAY);
+  await expect(overlay).toBeVisible();
+  await overlay.locator('input[type="checkbox"]').check();
+  await overlay.getByRole("button", { name: "Close" }).click();
+  await expect(overlay).toHaveCount(0);
+}
+
+/**
+ * Dismiss the reveal modal when one is open, otherwise do nothing.
+ *
+ * Separate from dismissBackupCodesModal() because absence is a legitimate
+ * outcome here: the reveal only appears when enrollment actually generated a
+ * set, and maybe_generate_for_user() is a no-op for a user that already has one.
+ */
+export async function dismissBackupCodesModalIfPresent(
+  page: Page,
+): Promise<void> {
+  const overlay = page.locator(BACKUP_CODES_OVERLAY);
+
+  if ((await overlay.count()) === 0) {
+    return;
+  }
+
+  await dismissBackupCodesModal(page);
 }

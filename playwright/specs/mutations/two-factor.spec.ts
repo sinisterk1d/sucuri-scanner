@@ -20,7 +20,7 @@
  * code string from setup (no recompute) so it still proves replay rejection.
  */
 import { test, expect } from "../../support/fixtures";
-import type { Browser, Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
 import {
   TwoFactorAdminPage,
   loginExpect2FA,
@@ -30,7 +30,7 @@ import {
   completeSetupWithGeneratedCode,
 } from "../../support/pages/two-factor.page";
 import { totp } from "../../support/totp";
-import { addWafDismissCookie } from "../../support/auth";
+import { withFreshUser } from "../../support/auth";
 import {
   restoreAllUserMeta,
   restorePluginData,
@@ -68,6 +68,10 @@ const TRANSIENT_PREFIXES = [
 const USER_META_KEYS = [
   "sucuriscan_topt_secret_key",
   "sucuriscan_topt_last_success",
+  // Enrollment mints backup codes as a side effect, so they have to be restored
+  // with the secret. Left behind, they outlive the secret that created them and
+  // would still open a challenge for a user these tests believe is un-enrolled.
+  "sucuriscan_topt_backup_codes",
   "session_tokens",
 ] as const;
 
@@ -101,28 +105,6 @@ const BULK_USER_COUNT = 60;
 
 function ensureBulkUsers(): void {
   createdBulkUsers = createBulkUsers(BULK_USER_COUNT);
-}
-
-/**
- * Run a wp-login flow for `user` in an isolated context (fresh cookies/storage)
- * so the login actually hits the 2FA challenge instead of reusing the project's
- * already-authenticated admin session. The WAF dismiss cookie is seeded so the
- * activation modal never blocks the form.
- */
-async function withFreshUser(
-  browser: Browser,
-  fn: (page: Page) => Promise<void>,
-): Promise<void> {
-  const context = await browser.newContext({
-    storageState: { cookies: [], origins: [] },
-  });
-  await addWafDismissCookie(context);
-  const page = await context.newPage();
-  try {
-    await fn(page);
-  } finally {
-    await context.close();
-  }
 }
 
 /**

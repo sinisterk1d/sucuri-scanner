@@ -54,6 +54,28 @@ export async function submitLogin(page: Page, user: WpUser): Promise<void> {
 }
 
 /**
+ * Run `fn` against a page in an isolated context (fresh cookies/storage) so a
+ * login actually hits the 2FA challenge instead of reusing the project's
+ * already-authenticated admin session. The WAF dismiss cookie is seeded so the
+ * activation modal never blocks the form. The context is always closed.
+ */
+export async function withFreshUser<T>(
+  browser: Browser,
+  fn: (page: Page) => Promise<T>,
+): Promise<T> {
+  const context = await browser.newContext({
+    storageState: { cookies: [], origins: [] },
+  });
+  await addWafDismissCookie(context);
+  const page = await context.newPage();
+  try {
+    return await fn(page);
+  } finally {
+    await context.close();
+  }
+}
+
+/**
  * Log in as admin in a fresh context and (re)write the admin storageState file.
  * Used by the setup project and by any spec that invalidates the admin session
  * (e.g. rotating the WordPress secret keys), so later specs re-read valid cookies.

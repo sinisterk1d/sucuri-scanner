@@ -34,9 +34,15 @@ if (!is_array($logins)) {
 SucuriScanOption::updateOption(":twofactor_mode", "disabled");
 SucuriScanOption::updateOption(":twofactor_users", array());
 
+// Backup codes are dropped alongside the secret, and both matter. Leaving them
+// behind breaks two things: a user whose secret was wiped could still complete a
+// challenge with a stale code, and maybe_generate_for_user() is a no-op when a
+// set already exists -- so the next enrollment would generate nothing and the
+// one-time reveal modal the backup-codes spec asserts would never appear.
 foreach (get_users(array("fields" => "ID")) as $userId) {
     delete_user_meta($userId, "sucuriscan_topt_secret_key");
     delete_user_meta($userId, "sucuriscan_topt_last_success");
+    delete_user_meta($userId, "sucuriscan_topt_backup_codes");
 }
 
 // A pending-login challenge lives in a transient. Leaving a stale one behind

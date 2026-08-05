@@ -11,17 +11,17 @@ playwright/
   support/                    # shared helpers + fixtures (this dir)
     env.ts                    # users, URLs, cookie/option names, plugin slug
     fixtures.ts               # extended `test` (`loggedOutRequest`, `cacheControlContent`)
-    auth.ts                   # login / submitLogin / addWafDismissCookie
+    auth.ts                   # login / submitLogin / withFreshUser / addWafDismissCookie
     notices.ts                # expectNotice / notice / expectNoErrorNotice
     http.ts                   # response-header / 403 / 200 assertions
-    audit-logs.ts             # typed seam over tests/e2e-seed-audit-logs.sh
+    audit-logs.ts             # seed seam + CSV export link resolution
     cache-control.ts          # typed seam over tests/e2e-seed-cache-control.sh
     scanner.ts                # typed seam over tests/e2e-seed-scanner.sh
     settings-general.ts       # typed seam over tests/e2e-seed-settings-general.sh
     two-factor-state.ts       # typed seam over tests/e2e-seed-two-factor.sh
     wp-cli.ts                 # wp-env tests-cli helpers (options, eval, seeds)
     totp.ts                   # RFC-6238 TOTP generator (2FA)
-    pages/two-factor.page.ts  # 2FA admin page object + login-challenge helpers
+    pages/two-factor.page.ts  # 2FA admin page object, login-challenge + backup-code helpers
     global.setup.ts           # `setup` project: provision users + admin storageState
   data/                       # JSON fixtures (audit logs)
   specs/
@@ -95,14 +95,14 @@ isolated wp-env.
 import { test, expect } from '../../support/fixtures';      // gives `loggedOutRequest`, `cacheControlContent`
 // or: import { test, expect } from '@playwright/test';      // when no extra fixture needed
 
-import { seedAuditQueue } from '../../support/audit-logs';
+import { seedAuditQueue, auditLogsDownloadUrl } from '../../support/audit-logs';
 import { quarantineFuturePosts, restoreFuturePosts } from '../../support/cache-control';
 import { clearScannerDataStores, seedScannerFixtures } from '../../support/scanner';
 import { writeIntegrityDatastore } from '../../support/settings-general';
 import { resetTwoFactorState, createBulkUsers, deleteUsers } from '../../support/two-factor-state';
 
 import { expectNotice, expectNoErrorNotice } from '../../support/notices';
-import { login, submitLogin, addWafDismissCookie } from '../../support/auth';
+import { login, submitLogin, withFreshUser, addWafDismissCookie } from '../../support/auth';
 import {
   getOption, updateOption, deleteOption, wp, wpEval, runPluginScript,
   readWpConfig, readSettingsFileJson, ensureUser, getUserId,
@@ -117,6 +117,8 @@ import {
 import {
   TwoFactorAdminPage, loginExpect2FA, expectChallenge,
   extractSecret, finishWithCode, completeSetupWithGeneratedCode,
+  completeSetupWithBackupCodes, readBackupCodesFromModal,
+  dismissBackupCodesModal, dismissBackupCodesModalIfPresent,
 } from '../../support/pages/two-factor.page';
 import { adminUser, testAdminUser, extraUser, resetUser } from '../../support/env';
 ```
