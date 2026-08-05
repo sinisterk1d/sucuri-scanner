@@ -51,7 +51,13 @@
 
                 writeQueueSize(data.queueSize, data.status != 'API is not available; using local queue');
 
-                $('.sucuriscan-auditlog-status').html(data.status);
+                var status = data.status;
+
+                if (data.limited) {
+                    status += (status ? ' &mdash; ' : '') + '{{Results are limited to the latest audit trails available.}}';
+                }
+
+                $('.sucuriscan-auditlog-status').html(status);
                 $('.sucuriscan-auditlog-footer').removeClass('sucuriscan-hidden');
 
                 if (data.filters !== undefined) {
@@ -100,14 +106,14 @@
             var url = new URL(event.target.href);
             var page = url.searchParams.get('paged');
 
-            var filters = {
-                time: url.searchParams.get('time'),
-                posts: url.searchParams.get('posts'),
-                logins: url.searchParams.get('logins'),
-                users: url.searchParams.get('users'),
-                plugins: url.searchParams.get('plugins'),
-                files: url.searchParams.get('files'),
-            };
+            var filters = {};
+
+            ['time', 'posts', 'logins', 'users', 'plugins', 'themes', 'files', 'events', 'search']
+                .forEach(function (filter) {
+                    if (url.searchParams.get(filter) !== null) {
+                        filters[filter] = url.searchParams.get(filter);
+                    }
+                });
 
             if (url.searchParams.get('startDate') !== null) {
                 filters.startDate = url.searchParams.get('startDate');
@@ -156,19 +162,25 @@
             if (e.target.id == 'filter-button') {
                 var filters = {};
 
+                var search = $('#auditlog-search').val().trim();
                 var time = $('#time').val();
                 var posts = $('#posts').val();
                 var logins = $('#logins').val();
                 var users = $('#users').val();
                 var plugins = $('#plugins').val();
+                var themes = $('#themes').val();
                 var files = $('#files').val();
+                var events = $('#events').val();
 
+                if (search !== '') filters.search = search;
                 if (time !== 'all time') filters.time = time;
                 if (posts !== 'all posts') filters.posts = posts;
                 if (logins !== 'all logins') filters.logins = logins;
                 if (users !== 'all users') filters.users = users;
                 if (plugins !== 'all plugins') filters.plugins = plugins;
+                if (themes !== 'all themes') filters.themes = themes;
                 if (files !== 'all files') filters.files = files;
+                if (events !== 'all events') filters.events = events;
 
                 if (time === 'custom') {
                     var startDate = $('#startDate').val();
@@ -181,20 +193,15 @@
                 sucuriscanLoadAuditLogs(0, filters);
             }
 
-        });
-
-        document.body.addEventListener('click', function (e) {
             if (e.target.id == 'clear-filter-button') {
                 sucuriscanLoadAuditLogs(0);
+            }
+        });
 
-                $('#time').val('all time');
-                $('#posts').val('all posts');
-                $('#logins').val('all logins');
-                $('#users').val('all users');
-                $('#plugins').val('all plugins');
-                $('#files').val('all files');
-                $('#startDate').val('');
-                $('#endDate').val('');
+        document.body.addEventListener('keydown', function (e) {
+            if (e.target.id === 'auditlog-search' && e.key === 'Enter') {
+                e.preventDefault();
+                $('#filter-button').trigger('click');
             }
         });
 
@@ -215,6 +222,14 @@
 <div class="sucuriscan-panel">
     <div class="sucuriscan-auditlog-table">
         <div id="sucuriscan-filters"></div>
+
+        <div class="sucuriscan-hstatus sucuriscan-hstatus-2">
+            <p>
+                {{The CSV contains all audit trails currently stored on this website.}}
+                <a id="download-auditlogs-link" href="%%SUCURI.AuditLogs.DownloadURL%%"
+                   data-cy="sucuriscan_auditlogs_download_link">{{Download CSV}}</a>
+            </p>
+        </div>
 
         <div class="sucuriscan-auditlog-response" data-cy="sucuriscan_auditlog_response_loading">
             <em>{{Loading...}}</em>

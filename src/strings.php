@@ -30,6 +30,12 @@ __('Successfully sent to the API:', 'sucuri-scanner');
 __('Total request timeouts (failures):', 'sucuri-scanner');
 __('Total execution time:', 'sucuri-scanner');
 __('Send Logs', 'sucuri-scanner');
+__('Search audit trails', 'sucuri-scanner');
+__('Results are limited to the latest audit trails available.', 'sucuri-scanner');
+__('Filter', 'sucuri-scanner');
+__('Clear Filters', 'sucuri-scanner');
+__('The CSV contains all audit trails currently stored on this website.', 'sucuri-scanner');
+__('Download CSV', 'sucuri-scanner');
 
 // base.html.tpl
 __('Sucuri Security', 'sucuri-scanner');
@@ -615,7 +621,7 @@ __(
     'sucuri-scanner'
 );
 __(
-    'The scanner uses the <a href="http://php.net/manual/en/class.splfileobject.php" target="_blank" rel="noopener">PHP SPL library</a> and the <a target="_blank" href="http://php.net/manual/en/class.filesystemiterator.php" rel="noopener">Filesystem Iterator</a> class to scan the directory tree where your website is located in the server. This library is only available on PHP 5 >= 5.3.0 &mdash; OR &mdash; PHP 7; if you have an older version of PHP the plugin will not work as expected. Please ask your hosting provider to advise you on this matter.',
+    'The scanner uses the <a href="http://php.net/manual/en/class.splfileobject.php" target="_blank" rel="noopener">PHP SPL library</a> and the <a target="_blank" href="http://php.net/manual/en/class.filesystemiterator.php" rel="noopener">Filesystem Iterator</a> class to scan the directory tree where your website is located in the server. This library requires PHP 7.4 or greater; if you have an older version of PHP the plugin will not work as expected. Please ask your hosting provider to advise you on this matter.',
     'sucuri-scanner'
 );
 __(
