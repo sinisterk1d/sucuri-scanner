@@ -45,6 +45,16 @@ class BackupRegenSendJsonStop extends \RuntimeException
  */
 final class TwoFactorBackupRegenTest extends TestCase
 {
+    /**
+     * Markup the regeneration control is identified by. Shared between the
+     * "omits" and "includes" snippet tests on purpose: the omission test can
+     * only assert absence, which would rot silently if the template renamed
+     * these, so it is paired with a presence test over the same literals.
+     */
+    private const REGEN_BTN_ID = 'id="sucuri-2fa-backup-regen-btn"';
+    private const REGEN_BTN_CY = 'data-cy="sucuriscan-2fa-backup-regen-btn"';
+    private const REGEN_BTN_LABEL = 'backup code(s) remaining';
+
     /** @var array<int, array<string, mixed>> */
     private $userMeta = [];
 
@@ -149,6 +159,56 @@ final class TwoFactorBackupRegenTest extends TestCase
     }
 
     /**
+     * Run an endpoint that is expected to terminate the request via
+     * wp_send_json_*() and hand back the captured response.
+     *
+     * The stubs throw because the real functions die(): without that, execution
+     * would fall through a branch that is terminal in production and the
+     * side-effect assertions below would be meaningless.
+     *
+     * @param callable $fn
+     * @return BackupRegenSendJsonStop
+     */
+    private function captureJsonStop(callable $fn): BackupRegenSendJsonStop
+    {
+        try {
+            $fn();
+        } catch (BackupRegenSendJsonStop $e) {
+            return $e;
+        }
+
+        $this->fail('Expected wp_send_json_* to halt execution');
+    }
+
+    /**
+     * Assert that the request minted no backup codes for the given user.
+     *
+     * @param int $user_id
+     * @param string $message
+     * @return void
+     */
+    private function assertNoCodesMintedFor(int $user_id, string $message): void
+    {
+        $this->assertArrayNotHasKey(
+            SucuriScanBackupCodes::META_KEY,
+            isset($this->userMeta[$user_id]) ? $this->userMeta[$user_id] : [],
+            $message
+        );
+    }
+
+    /**
+     * Read back the local audit queue the plugin writes events into.
+     *
+     * @return string
+     */
+    private function auditQueueContents(): string
+    {
+        $path = BASE_DIR . '/tests/fixtures/sucuri-auditqueue.php';
+
+        return file_exists($path) ? file_get_contents($path) : '';
+    }
+
+    /**
      * @param string $name Protected/static method name.
      * @return ReflectionMethod
      */
@@ -172,21 +232,14 @@ final class TwoFactorBackupRegenTest extends TestCase
         $_POST['user_id'] = '99';
         $_POST['nonce'] = 'nonce';
 
-        try {
-            SucuriScanTwoFactor::ajax_profile_backup_regen();
-            $this->fail('Expected wp_send_json_error to halt execution');
-        } catch (BackupRegenSendJsonStop $e) {
-            $this->assertFalse($e->success, 'regenerating for another user must not succeed');
-            $this->assertSame(403, $e->status);
-            $this->assertStringContainsString('your own account', $e->payload['message']);
-        }
+        $e = $this->captureJsonStop([SucuriScanTwoFactor::class, 'ajax_profile_backup_regen']);
+
+        $this->assertFalse($e->success, 'regenerating for another user must not succeed');
+        $this->assertSame(403, $e->status);
+        $this->assertStringContainsString('your own account', $e->payload['message']);
 
         // Crucially, no codes may be minted for the target as a side effect.
-        $this->assertArrayNotHasKey(
-            SucuriScanBackupCodes::META_KEY,
-            $this->userMeta[99],
-            'no backup codes may be generated for a non-self target'
-        );
+        $this->assertNoCodesMintedFor(99, 'no backup codes may be generated for a non-self target');
     }
 
     public function testRegenAllowedForSelf(): void
@@ -199,15 +252,40 @@ final class TwoFactorBackupRegenTest extends TestCase
         $_POST['user_id'] = '7';
         $_POST['nonce'] = 'nonce';
 
-        try {
-            SucuriScanTwoFactor::ajax_profile_backup_regen();
-            $this->fail('Expected wp_send_json_success to halt execution');
-        } catch (BackupRegenSendJsonStop $e) {
-            $this->assertTrue($e->success, 'self regeneration must succeed');
-            $this->assertCount(SucuriScanBackupCodes::CODE_COUNT, $e->payload['backupCodes']);
-        }
+        $e = $this->captureJsonStop([SucuriScanTwoFactor::class, 'ajax_profile_backup_regen']);
+
+        $this->assertTrue($e->success, 'self regeneration must succeed');
+        $this->assertCount(SucuriScanBackupCodes::CODE_COUNT, $e->payload['backupCodes']);
 
         $this->assertArrayHasKey(SucuriScanBackupCodes::META_KEY, $this->userMeta[7]);
+    }
+
+    /**
+     * Regeneration silently replaces a set of credentials that are a full
+     * substitute for the second factor, so the audit trail is the account
+     * owner's only signal that it happened.
+     */
+    public function testSuccessfulRegenIsRecordedInTheAuditLog(): void
+    {
+        Functions\when('get_current_user_id')->justReturn(7);
+
+        $this->enableTotpFor(7);
+
+        $_POST['user_id'] = '7';
+        $_POST['nonce'] = 'nonce';
+
+        $before = $this->auditQueueContents();
+
+        $e = $this->captureJsonStop([SucuriScanTwoFactor::class, 'ajax_profile_backup_regen']);
+        $this->assertTrue($e->success);
+
+        $after = $this->auditQueueContents();
+
+        $this->assertNotSame($before, $after, 'the audit queue must have been appended to');
+        $this->assertStringContainsString(
+            'Two-factor backup codes regenerated for user ID 7',
+            $after
+        );
     }
 
     /**
@@ -226,13 +304,10 @@ final class TwoFactorBackupRegenTest extends TestCase
         $_POST['user_id'] = '7';
         $_POST['nonce'] = 'nonce';
 
-        try {
-            SucuriScanTwoFactor::ajax_profile_backup_regen();
-            $this->fail('Expected wp_send_json_success to halt execution');
-        } catch (BackupRegenSendJsonStop $e) {
-            $this->assertTrue($e->success, 'a numeric-string user id must still resolve as self');
-            $this->assertCount(SucuriScanBackupCodes::CODE_COUNT, $e->payload['backupCodes']);
-        }
+        $e = $this->captureJsonStop([SucuriScanTwoFactor::class, 'ajax_profile_backup_regen']);
+
+        $this->assertTrue($e->success, 'a numeric-string user id must still resolve as self');
+        $this->assertCount(SucuriScanBackupCodes::CODE_COUNT, $e->payload['backupCodes']);
     }
 
     public function testRegenRequiresAnExistingSecret(): void
@@ -243,13 +318,64 @@ final class TwoFactorBackupRegenTest extends TestCase
         $_POST['user_id'] = '7';
         $_POST['nonce'] = 'nonce';
 
-        try {
-            SucuriScanTwoFactor::ajax_profile_backup_regen();
-            $this->fail('Expected wp_send_json_error to halt execution');
-        } catch (BackupRegenSendJsonStop $e) {
-            $this->assertFalse($e->success);
-            $this->assertSame(400, $e->status);
-        }
+        $e = $this->captureJsonStop([SucuriScanTwoFactor::class, 'ajax_profile_backup_regen']);
+
+        $this->assertFalse($e->success);
+        $this->assertSame(400, $e->status);
+        // Assert the message, not just the status: "Invalid user." and
+        // "Two-Factor not enforced for this user" are also 400s on this path, so
+        // a status-only assertion stays green even when the request never
+        // reaches the secret check.
+        $this->assertStringContainsString('Two-Factor must be enabled', $e->payload['message']);
+
+        $this->assertNoCodesMintedFor(7, 'no codes may be minted without an existing secret');
+    }
+
+    /**
+     * The endpoint is reachable by any logged-in user, so the nonce is what
+     * stops a third-party page from spending a victim's session to mint codes
+     * and read them back out of the response.
+     */
+    public function testRegenRejectsAnInvalidNonce(): void
+    {
+        Functions\when('get_current_user_id')->justReturn(7);
+        Functions\when('wp_verify_nonce')->justReturn(false);
+
+        $this->enableTotpFor(7);
+
+        $_POST['user_id'] = '7';
+        $_POST['nonce'] = 'forged';
+
+        $e = $this->captureJsonStop([SucuriScanTwoFactor::class, 'ajax_profile_backup_regen']);
+
+        $this->assertFalse($e->success);
+        $this->assertSame(403, $e->status);
+        $this->assertStringContainsString('Invalid security token', $e->payload['message']);
+
+        $this->assertNoCodesMintedFor(7, 'a rejected nonce must not mint codes');
+    }
+
+    /**
+     * get_current_user_id() stays valid here on purpose: the identical
+     * 403/"Forbidden" is also returned when the session resolves to user 0, so
+     * leaving a real id in place is what pins this test to the logged-in guard.
+     */
+    public function testRegenDeniedWhenNotLoggedIn(): void
+    {
+        Functions\when('is_user_logged_in')->justReturn(false);
+        Functions\when('get_current_user_id')->justReturn(7);
+
+        $this->enableTotpFor(7);
+
+        $_POST['user_id'] = '7';
+        $_POST['nonce'] = 'nonce';
+
+        $e = $this->captureJsonStop([SucuriScanTwoFactor::class, 'ajax_profile_backup_regen']);
+
+        $this->assertFalse($e->success);
+        $this->assertSame(403, $e->status);
+
+        $this->assertNoCodesMintedFor(7, 'a logged-out request must not mint codes');
     }
 
     public function testStatusSnippetOmitsRegenControlForOtherUsers(): void
@@ -260,19 +386,25 @@ final class TwoFactorBackupRegenTest extends TestCase
         // Assert on the markup, not the bare id: the inline script keeps a
         // '#sucuri-2fa-backup-regen-btn' selector either way (it no-ops when
         // the control is absent).
-        $this->assertStringNotContainsString('id="sucuri-2fa-backup-regen-btn"', $html);
-        $this->assertStringNotContainsString('data-cy="sucuriscan-2fa-backup-regen-btn"', $html);
-        $this->assertStringNotContainsString('backup code(s) remaining', $html);
+        $this->assertStringNotContainsString(self::REGEN_BTN_ID, $html);
+        $this->assertStringNotContainsString(self::REGEN_BTN_CY, $html);
+        $this->assertStringNotContainsString(self::REGEN_BTN_LABEL, $html);
         // The reset control remains available to administrators.
         $this->assertStringContainsString('id="sucuri-2fa-reset-btn"', $html);
     }
 
+    /**
+     * Counterpart to the test above. These two must stay together: the omission
+     * test is all negative assertions, which would keep passing if the template
+     * renamed the control, and this one is what turns such a rename into a
+     * failure.
+     */
     public function testStatusSnippetIncludesRegenControlForSelf(): void
     {
         $html = $this->method('profile_status_snippet')->invoke(null, 42, true);
 
-        $this->assertStringContainsString('id="sucuri-2fa-backup-regen-btn"', $html);
-        $this->assertStringContainsString('data-cy="sucuriscan-2fa-backup-regen-btn"', $html);
-        $this->assertStringContainsString('backup code(s) remaining', $html);
+        $this->assertStringContainsString(self::REGEN_BTN_ID, $html);
+        $this->assertStringContainsString(self::REGEN_BTN_CY, $html);
+        $this->assertStringContainsString(self::REGEN_BTN_LABEL, $html);
     }
 }
