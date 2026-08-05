@@ -195,6 +195,37 @@
     buildModal(validCodes, onClose);
   };
 
+  /**
+   * Resolve a stashed post-reveal destination to a same-origin URL, or to an
+   * empty string when it is anything else.
+   *
+   * The server validates this value before stashing it, but it reaches us via
+   * a transient and is handed straight to window.location.assign() -- which
+   * executes "javascript:" URLs in this origin -- so the scheme/host check is
+   * repeated here instead of being trusted end to end.
+   */
+  const sameOriginURL = (value) => {
+    if (typeof value !== "string" || value === "") {
+      return "";
+    }
+
+    try {
+      const target = new URL(value, window.location.origin);
+
+      if (target.origin !== window.location.origin) {
+        return "";
+      }
+
+      if (target.protocol !== "http:" && target.protocol !== "https:") {
+        return "";
+      }
+
+      return target.href;
+    } catch (error) {
+      return "";
+    }
+  };
+
   const revealData = document.getElementById(
     "sucuriscan-backup-codes-reveal-data",
   );
@@ -205,7 +236,9 @@
 
     try {
       codes = JSON.parse(revealData.dataset.codes || "[]");
-      redirectURL = JSON.parse(revealData.dataset.redirectUrl || '""');
+      redirectURL = sameOriginURL(
+        JSON.parse(revealData.dataset.redirectUrl || '""'),
+      );
     } catch (error) {
       codes = [];
       redirectURL = "";

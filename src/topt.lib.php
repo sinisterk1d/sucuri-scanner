@@ -1065,12 +1065,21 @@ class SucuriScanTwoFactor extends SucuriScan
      * Build the one-time backup-codes reveal snippet (a hidden data element
      * consumed client-side by inc/js/backup-codes.js).
      *
+     * The destination is re-validated here even though the login flow already
+     * ran it through wp_validate_redirect() before stashing it: the value
+     * travels through a transient and ends up in window.location.assign(), so
+     * the guard is kept next to the sink rather than only at the entry point.
+     * wp_validate_redirect() is idempotent, and an empty fallback makes the
+     * client skip the redirect entirely rather than sending it somewhere else.
+     *
      * @param string[] $codes Plaintext codes.
      *
      * @return string HTML.
      */
     protected static function backup_codes_reveal_snippet(array $codes, $redirect_to = '')
     {
+        $redirect_to = wp_validate_redirect((string) $redirect_to, '');
+
         return SucuriScanTemplate::getSnippet('profile-2fa-backup-codes', array(
             'CodesJSON' => wp_json_encode(array_values($codes)),
             'RedirectURL' => wp_json_encode((string) $redirect_to),
