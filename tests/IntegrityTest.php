@@ -6,10 +6,24 @@ use PHPUnit\Framework\TestCase;
 
 final class IntegrityTest extends TestCase
 {
+    /** @var string */
+    private $settingsPath;
+
+    /** @var string */
+    private $settingsBackup;
+
     protected function setUp(): void
     {
         parent::setUp();
         Monkey\setUp();
+
+        /**
+         * Reporting an event bumps the e-mail throttle counters in this
+         * tracked fixture; without a restore, running the suite leaves the
+         * working tree dirty and the drift gets committed by accident.
+         */
+        $this->settingsPath = SUCURI_DATA_STORAGE . '/sucuri-settings.php';
+        $this->settingsBackup = (string) file_get_contents($this->settingsPath);
 
         // Simple in-memory cache for wp_cache_* mocks
         $GLOBALS['__wp_cache'] = [];
@@ -69,6 +83,8 @@ final class IntegrityTest extends TestCase
 
     protected function tearDown(): void
     {
+        file_put_contents($this->settingsPath, $this->settingsBackup);
+
         Monkey\tearDown();
         unset($GLOBALS['__wp_cache']);
         unset($GLOBALS['__sucuri_test_mails']);

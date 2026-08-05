@@ -274,8 +274,13 @@ class SucuriScanAPI extends SucuriScanOption
             return true;
         }
 
+        /**
+         * Every message below is built from a remote response and ends up in
+         * an admin notice that renders raw HTML, so it is escaped here rather
+         * than trusted to arrive clean.
+         */
         if (is_string($res) && !empty($res)) {
-            return SucuriScanInterface::error($res);
+            return SucuriScanInterface::error(esc_html($res));
         }
 
         if (!is_array($res)
@@ -306,7 +311,7 @@ class SucuriScanAPI extends SucuriScanOption
             SucuriScanOption::setRevProxy('disable', true);
             SucuriScanOption::setAddrHeader('REMOTE_ADDR', true);
 
-            return SucuriScanInterface::error($msg);
+            return SucuriScanInterface::error(esc_html($msg));
         }
 
         // Stop SSL peer verification on connection failures.
@@ -325,7 +330,7 @@ class SucuriScanAPI extends SucuriScanOption
             $msg = __('Invalid email format or the host is missing MX records.', 'sucuri-scanner');
         }
 
-        return SucuriScanInterface::error($msg);
+        return SucuriScanInterface::error(esc_html($msg));
     }
 
     /**
@@ -484,6 +489,21 @@ class SucuriScanAPI extends SucuriScanOption
     }
 
     /**
+     * Apply audit-log filters to an existing API response.
+     *
+     * Keeping the raw response in the cache allows every filter and search to
+     * operate on the same set of logs instead of caching one filtered result.
+     *
+     * @param array $res     Parsed or raw API response containing output logs.
+     * @param array $filters Filters to apply to the logs.
+     * @return array|null Filtered audit-log response.
+     */
+    public static function filterAuditLogs($res, $filters = array())
+    {
+        return self::parseAuditLogs($res, $filters);
+    }
+
+    /**
      * Retrieves the available filters for the audit logs.
      *
      * @return array An associative array containing the filters for the auditlogs.
@@ -628,6 +648,36 @@ class SucuriScanAPI extends SucuriScanOption
                     'label' => __('Deactivated', 'sucuri-scanner'),
                     'value' => 'Plugin deactivated',
                 ),
+                'updated' => array(
+                    'label' => __('Updated', 'sucuri-scanner'),
+                    'value' => 'Plugin updated',
+                ),
+                'deleted' => array(
+                    'label' => __('Deleted', 'sucuri-scanner'),
+                    'value' => 'Plugin deleted',
+                ),
+            ),
+            'themes' => array(
+                'all themes' => array(
+                    'label' => __('All Themes', 'sucuri-scanner'),
+                    'value' => '',
+                ),
+                'installed' => array(
+                    'label' => __('Installed', 'sucuri-scanner'),
+                    'value' => 'Theme installed',
+                ),
+                'activated' => array(
+                    'label' => __('Activated', 'sucuri-scanner'),
+                    'value' => 'Theme activated',
+                ),
+                'updated' => array(
+                    'label' => __('Updated', 'sucuri-scanner'),
+                    'value' => 'Theme updated',
+                ),
+                'deleted' => array(
+                    'label' => __('Deleted', 'sucuri-scanner'),
+                    'value' => 'Theme deleted',
+                ),
             ),
             'files' => array(
                 'all files' => array(
@@ -637,6 +687,36 @@ class SucuriScanAPI extends SucuriScanOption
                 'added' => array(
                     'label' => __('Added', 'sucuri-scanner'),
                     'value' => 'Media file added',
+                ),
+            ),
+            'events' => array(
+                'all events' => array(
+                    'label' => __('All Severities', 'sucuri-scanner'),
+                    'value' => '',
+                ),
+                'critical' => array(
+                    'label' => __('Critical', 'sucuri-scanner'),
+                    'value' => 'critical',
+                ),
+                'error' => array(
+                    'label' => __('Error', 'sucuri-scanner'),
+                    'value' => 'error',
+                ),
+                'warning' => array(
+                    'label' => __('Warning', 'sucuri-scanner'),
+                    'value' => 'warning',
+                ),
+                'notice' => array(
+                    'label' => __('Notice', 'sucuri-scanner'),
+                    'value' => 'notice',
+                ),
+                'info' => array(
+                    'label' => __('Info', 'sucuri-scanner'),
+                    'value' => 'info',
+                ),
+                'debug' => array(
+                    'label' => __('Debug', 'sucuri-scanner'),
+                    'value' => 'debug',
                 ),
             ),
         );
@@ -663,31 +743,72 @@ class SucuriScanAPI extends SucuriScanOption
             }
         }
 
+        if (isset($frontend_filters['search']) && $frontend_filters['search'] !== '') {
+            $searchable = array(
+                $log['event'],
+                $log['datetime'],
+                $log['account'],
+                $log['username'],
+                $log['remote_addr'],
+                $log['message'],
+                implode("\x20", (array) $log['file_list']),
+            );
+
+            /**
+             * The haystack is decoded, not the needle. Hooks store names
+             * through SucuriScan::escape(), so a plugin called "R&D Tools" is
+             * on disk as "R&amp;D Tools"; the search term arrives decoded, and
+             * comparing the two raw would never match. Decoding here keeps the
+             * stored term escaped for the filter input and the pagination
+             * links, which escape it again on their way back out.
+             */
+            $haystack = html_entity_decode(implode("\x20", $searchable), ENT_QUOTES, 'UTF-8');
+
+            if (stripos($haystack, $frontend_filters['search']) === false) {
+                return false;
+            }
+        }
+
+        if (isset($frontend_filters['events'])) {
+            $event_filter = $frontend_filters['events'];
+
+            if (!isset($filters['events'][$event_filter])
+                || $log['event'] !== $filters['events'][$event_filter]['value']
+            ) {
+                return false;
+            }
+        }
+
         $other_filters = $frontend_filters;
-        unset($other_filters['time'], $other_filters['startDate'], $other_filters['endDate']);
+        unset(
+            $other_filters['time'],
+            $other_filters['startDate'],
+            $other_filters['endDate'],
+            $other_filters['search'],
+            $other_filters['events']
+        );
 
         if (empty($other_filters)) {
             return true;
         }
 
-        // Check if the log matches any of the other filters
+        // Activity categories use OR semantics so users can combine event types.
         foreach ($other_filters as $active_filter => $value_filter) {
             if (isset($filters[$active_filter][$value_filter])) {
                 $search_term = $filters[$active_filter][$value_filter]['value'];
 
-                $match = false;
-
                 if (is_array($search_term)) {
                     foreach ($search_term as $term) {
                         if (strpos($log['message'], $term) !== false) {
-                            $match = true;
+                            return true;
                         }
                     }
-
-                    return $match;
                 }
 
-                if (strpos($log['message'], $search_term) !== false) {
+                if (is_string($search_term)
+                    && $search_term !== ''
+                    && strpos($log['message'], $search_term) !== false
+                ) {
                     return true;
                 }
             }
@@ -913,6 +1034,16 @@ class SucuriScanAPI extends SucuriScanOption
             }
 
             $log_data = self::getLogsHotfix($log_data);
+
+            /**
+             * Redacted again on the way out, not only on the way in: records
+             * written by plugin versions that predate the redaction are still
+             * sitting in the queue, and they are displayed and exported by this
+             * same method. Redacting before the filters run also keeps a
+             * credential from being searchable.
+             */
+            $log_data['message'] = SucuriScanEvent::redactSensitiveData($log_data['message']);
+            $log_data['file_list'] = SucuriScanEvent::redactSensitiveData($log_data['file_list']);
 
             // Based on filters, evaluate if should skip.
             if (self::filterAuditLog($log_data, $filters) === false) {

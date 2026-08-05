@@ -86,4 +86,103 @@ final class AuditlogsTest extends TestCase
             $this->assertStringContainsString('User account deleted', $log['message']);
         }
     }
+
+    public function testSearchesAuditLogFieldsCaseInsensitively()
+    {
+        $auditlogs = SucuriScanAPI::getAuditLogsFromQueue(array(
+            'search' => 'activity log',
+        ));
+
+        $this->assertCount(1, $auditlogs['output_data']);
+        $this->assertStringContainsString('Activity Log', $auditlogs['output_data'][0]['message']);
+
+        $auditlogs = SucuriScanAPI::getAuditLogsFromQueue(array(
+            'search' => '1.2.3.4',
+        ));
+
+        $this->assertNotEmpty($auditlogs['output_data']);
+
+        foreach ($auditlogs['output_data'] as $log) {
+            $this->assertSame('1.2.3.4', $log['remote_addr']);
+        }
+    }
+
+    public function testSearchesNamesThatWereStoredHtmlEscaped()
+    {
+        /**
+         * Hooks record plugin and theme names through SucuriScan::escape(), so
+         * "R&D Tools" sits in the queue as "R&amp;D Tools". The search term
+         * arrives decoded, and comparing the two raw would never match.
+         */
+        $auditlogs = SucuriScanAPI::filterAuditLogs(
+            array(
+                'output' => array(
+                    '2026-07-15 10:30:00 admin@example.com : Warning: admin, 192.0.2.1;'
+                    . ' Plugin activated: R&amp;D Tools (v1.0; rd-tools/rd-tools.php)',
+                ),
+                'total_entries' => 1,
+            ),
+            array('search' => 'R&D Tools')
+        );
+
+        $this->assertCount(1, $auditlogs['output_data']);
+    }
+
+    public function testSearchNarrowsCategoryFilters()
+    {
+        $auditlogs = SucuriScanAPI::getAuditLogsFromQueue(array(
+            'plugins' => 'activated',
+            'search' => 'activity log',
+        ));
+
+        $this->assertCount(1, $auditlogs['output_data']);
+        $this->assertStringContainsString('Plugin activated', $auditlogs['output_data'][0]['message']);
+    }
+
+    public function testMultipleActivityCategoriesUseOrSemantics()
+    {
+        $auditlogs = SucuriScanAPI::getAuditLogsFromQueue(array(
+            'posts' => 'deleted',
+            'plugins' => 'activated',
+        ));
+
+        $this->assertCount(3, $auditlogs['output_data']);
+
+        foreach ($auditlogs['output_data'] as $log) {
+            $this->assertStringContainsString('Plugin activated', $log['message']);
+        }
+    }
+
+    public function testFiltersBySeverity()
+    {
+        $auditlogs = SucuriScanAPI::getAuditLogsFromQueue(array(
+            'events' => 'warning',
+        ));
+
+        $this->assertNotEmpty($auditlogs['output_data']);
+
+        foreach ($auditlogs['output_data'] as $log) {
+            $this->assertSame('warning', $log['event']);
+        }
+    }
+
+    public function testRedactsLegacyPasswordsBeforeFilteringOrExport()
+    {
+        /* records predating the redaction are masked when they are read back */
+        Functions\when('wp_strip_all_tags')->alias('sucuriscan_test_strip_all_tags');
+
+        $auditlogs = SucuriScanAPI::filterAuditLogs(array(
+            'output' => array(
+                '2026-07-15 10:30:00 admin@example.com : Error: admin, 192.0.2.1; User authentication failed: admin; password: secret',
+            ),
+            'total_entries' => 1,
+        ));
+
+        $this->assertCount(1, $auditlogs['output_data']);
+        $this->assertStringNotContainsString('secret', $auditlogs['output_data'][0]['message']);
+        $this->assertSame(
+            'User authentication failed: admin; password: [redacted]',
+            $auditlogs['output_data'][0]['message']
+        );
+    }
 }

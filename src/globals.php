@@ -152,6 +152,12 @@ if (defined('SUCURISCAN')) {
 
         /* Attach HTTP request handlers for the AJAX requests */
         add_action('wp_ajax_sucuriscan_ajax', 'sucuriscan_ajax');
+
+        /* The audit trail export is a file download, not an AJAX response */
+        add_action(
+            'admin_post_sucuriscan_download_audit_logs',
+            'SucuriScanAuditLogs::downloadAuditLogs'
+        );
     }
 
     /**

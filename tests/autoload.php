@@ -38,6 +38,34 @@ if (!function_exists('wp_kses_post')) {
     }
 }
 
+/**
+ * Mirror of wp_strip_all_tags() for the tests that need its real behaviour.
+ *
+ * Deliberately not named wp_strip_all_tags: anything declared in this bootstrap
+ * is loaded before Patchwork and can no longer be redefined, and some tests do
+ * stub that function. Those that want the real behaviour alias it to this with
+ * Functions\when('wp_strip_all_tags')->alias('sucuriscan_test_strip_all_tags').
+ *
+ * @param mixed $text          Value to strip.
+ * @param bool  $remove_breaks Collapse whitespace runs into a single space.
+ * @return string Stripped value.
+ */
+function sucuriscan_test_strip_all_tags($text, $remove_breaks = false)
+{
+    if (!is_scalar($text)) {
+        return '';
+    }
+
+    $text = preg_replace('@<(script|style)[^>]*?>.*?</\\1>@si', '', (string) $text);
+    $text = strip_tags((string) $text);
+
+    if ($remove_breaks) {
+        $text = preg_replace('/[\r\n\t ]+/', ' ', $text);
+    }
+
+    return trim($text);
+}
+
 if (file_exists(BASE_DIR . '/vendor/autoload.php')) {
     require BASE_DIR . '/vendor/autoload.php';
 }
