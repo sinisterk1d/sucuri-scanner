@@ -4,18 +4,19 @@
 /.git export-ignore
 /vendor export-ignore
 /node_modules export-ignore
-/cypress export-ignore
+/playwright export-ignore
 /tests export-ignore
 
 # Files
 /.gitattributes export-ignore
 /.gitignore export-ignore
 /.wp-env.json export-ignore
+/CLAUDE.md export-ignore
 /composer.json export-ignore
 /composer.lock export-ignore
-/cypress.config.js.example export-ignore
-/cypress.config.js export-ignore
 /package-lock.json export-ignore
 /package.json export-ignore
+/playwright.config.ts export-ignore
+/tsconfig.json export-ignore
 /Makefile export-ignore
 /phpunit.xml export-ignore
