@@ -61,19 +61,28 @@ jobs:
       - name: Check distribution manifest
         run: make check-dist
 
-  # Fails on a known advisory in either dependency tree.
+  # Reports known advisories in either dependency tree.
   #
   # None of these packages ship in the plugin, but they execute on developer
   # machines and on the runner that holds the wordpress.org SVN credentials, so
   # a compromised build dependency is a credential problem rather than only a
   # broken build.
   #
-  # This job can go red without anyone touching the code, when a new advisory is
-  # published against something already in the lock file. That is the intended
-  # behaviour: the fix is to update the dependency.
+  # Advisory on push and pull request, blocking on a release.
+  #
+  # This job can go red without anyone touching the code, when an advisory is
+  # published against something already in the lock file. On a pull request that
+  # is somebody else's news and should not stand between an unrelated change and
+  # review, so the run is allowed to pass with the job reported as failed. At
+  # release time the same finding does matter, because publishing is what puts
+  # the dependency in front of the credentials, so there it stops the deploy.
+  #
+  # release-tag is empty on push and pull_request, and set only when the deploy
+  # workflow calls this one.
   dependency-audit:
     name: Dependency audit
     runs-on: ubuntu-latest
+    continue-on-error: ${{ inputs.release-tag == '' }}
 
     steps:
       - name: Checkout the repository
