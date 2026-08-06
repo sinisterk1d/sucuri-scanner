@@ -2,14 +2,14 @@
 # This file is distributed under the GPL v2 or later.
 msgid ""
 msgstr ""
-"Project-Id-Version: Sucuri Security - Auditing, Malware Scanner and Hardening 2.7.4\n"
+"Project-Id-Version: Sucuri Security - Auditing, Malware Scanner and Hardening 2.7.5\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/sucuri-scanner\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-07-27T23:41:26+00:00\n"
+"POT-Creation-Date: 2026-08-06T06:21:57+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: sucuri-scanner\n"
@@ -184,13 +184,13 @@ msgstr ""
 
 #: src/api.lib.php:644
 #: src/api.lib.php:670
-#: src/topt.lib.php:1561
+#: src/topt.lib.php:1801
 msgid "Activated"
 msgstr ""
 
 #: src/api.lib.php:648
-#: src/topt.lib.php:1565
-#: src/topt.lib.php:1617
+#: src/topt.lib.php:1805
+#: src/topt.lib.php:1857
 msgid "Deactivated"
 msgstr ""
 
@@ -375,36 +375,36 @@ msgid "Password Change"
 msgstr ""
 
 #. translators: %s: file path
-#: src/event.lib.php:1117
+#: src/event.lib.php:1118
 #, php-format
 msgid "%s cannot be deleted."
 msgstr ""
 
 #. translators: %s: comma-separated list of filenames
-#: src/event.lib.php:1129
+#: src/event.lib.php:1130
 #, php-format
 msgid "%s log files were deleted."
 msgstr ""
 
 #. translators: %s: filename
-#: src/event.lib.php:1131
+#: src/event.lib.php:1132
 #, php-format
 msgid "%s log file was deleted."
 msgstr ""
 
-#: src/fileinfo.lib.php:291
+#: src/fileinfo.lib.php:292
 msgid "No files were found"
 msgstr ""
 
-#: src/fileinfo.lib.php:349
+#: src/fileinfo.lib.php:350
 msgid "Directory does not exists"
 msgstr ""
 
-#: src/fileinfo.lib.php:353
+#: src/fileinfo.lib.php:354
 msgid "Cannot delete content directory"
 msgstr ""
 
-#: src/fileinfo.lib.php:359
+#: src/fileinfo.lib.php:360
 msgid "Cannot delete uploads directory"
 msgstr ""
 
@@ -531,7 +531,7 @@ msgstr ""
 
 #: src/globals.php:103
 #: src/strings.php:825
-#: src/topt.lib.php:661
+#: src/topt.lib.php:734
 msgid "Two-Factor Authentication"
 msgstr ""
 
@@ -959,7 +959,7 @@ msgid "WordPress Integrity Diff Utility"
 msgstr ""
 
 #: src/interface.lib.php:210
-msgid "The plugin requires PHP 5 >= 5.3.0 - OR - PHP 7"
+msgid "The plugin requires PHP 7.4 or greater"
 msgstr ""
 
 #. translators: %s: absolute path of the settings file
@@ -1422,21 +1422,21 @@ msgid "Specifies how long the results of a preflight request can be cached."
 msgstr ""
 
 #. translators: %s: error message
-#: src/option.lib.php:1320
+#: src/option.lib.php:1316
 #, php-format
 msgid "Firewall API key decryption failed: %s"
 msgstr ""
 
-#: src/option.lib.php:1373
+#: src/option.lib.php:1369
 msgid "The Sucuri WAF API key could not be decrypted. Please re-save the key in the Firewall settings to restore functionality."
 msgstr ""
 
 #. translators: %1$s: domain, %2$s: event, %3$s: remote address
 #. translators: %1$s: specific info like domain, event, etc
-#: src/option.lib.php:1640
-#: src/settings-alerts.php:243
-#: src/settings-alerts.php:245
-#: src/settings-alerts.php:247
+#: src/option.lib.php:1636
+#: src/settings-alerts.php:242
+#: src/settings-alerts.php:244
+#: src/settings-alerts.php:246
 #, php-format
 msgid "Sucuri Alert, %1$s, %2$s, %3$s"
 msgstr ""
@@ -1523,277 +1523,277 @@ msgstr ""
 msgid "An error occurred sending email - please check your server mail configuration."
 msgstr ""
 
-#: src/settings-alerts.php:170
+#: src/settings-alerts.php:169
 msgid "The IP specified address was already added."
 msgstr ""
 
 #. translators: %s: IP address
-#: src/settings-alerts.php:174
+#: src/settings-alerts.php:173
 #, php-format
 msgid "IP has been trusted: %s"
 msgstr ""
 
 #. translators: %s: IP address
-#: src/settings-alerts.php:179
+#: src/settings-alerts.php:178
 #, php-format
 msgid "Events generated from this IP will be ignored: <code>%s</code>"
 msgstr ""
 
-#: src/settings-alerts.php:183
+#: src/settings-alerts.php:182
 msgid "The IP address could not be added to the trusted list"
 msgstr ""
 
-#: src/settings-alerts.php:196
+#: src/settings-alerts.php:195
 msgid "The selected IP addresses were successfully deleted."
 msgstr ""
 
-#: src/settings-alerts.php:205
+#: src/settings-alerts.php:204
 msgid "n/a"
 msgstr ""
 
 #. translators: %1$s: specific info like domain, event, etc
-#: src/settings-alerts.php:241
-#: src/settings-alerts.php:249
-#: src/settings-alerts.php:251
+#: src/settings-alerts.php:240
+#: src/settings-alerts.php:248
+#: src/settings-alerts.php:250
 #, php-format
 msgid "Sucuri Alert, %1$s, %2$s"
 msgstr ""
 
 #. translators: %s: event name
-#: src/settings-alerts.php:253
+#: src/settings-alerts.php:252
 #, php-format
 msgid "Sucuri Alert, %s"
 msgstr ""
 
-#: src/settings-alerts.php:281
+#: src/settings-alerts.php:280
 msgid "Invalid characters in the email subject."
 msgstr ""
 
 #. translators: %s: email subject
-#: src/settings-alerts.php:291
+#: src/settings-alerts.php:290
 #, php-format
 msgid "Email subject set to <code>%s</code>"
 msgstr ""
 
-#: src/settings-alerts.php:298
+#: src/settings-alerts.php:297
 msgid "The email subject has been successfully updated"
 msgstr ""
 
-#: src/settings-alerts.php:347
+#: src/settings-alerts.php:346
 msgid "Maximum 5 per hour"
 msgstr ""
 
-#: src/settings-alerts.php:348
+#: src/settings-alerts.php:347
 msgid "Maximum 10 per hour"
 msgstr ""
 
-#: src/settings-alerts.php:349
+#: src/settings-alerts.php:348
 msgid "Maximum 20 per hour"
 msgstr ""
 
-#: src/settings-alerts.php:350
+#: src/settings-alerts.php:349
 msgid "Maximum 40 per hour"
 msgstr ""
 
-#: src/settings-alerts.php:351
+#: src/settings-alerts.php:350
 msgid "Maximum 80 per hour"
 msgstr ""
 
-#: src/settings-alerts.php:352
+#: src/settings-alerts.php:351
 msgid "Maximum 160 per hour"
 msgstr ""
 
-#: src/settings-alerts.php:353
+#: src/settings-alerts.php:352
 msgid "Unlimited alerts per hour"
 msgstr ""
 
 #. translators: %s: maximum number
-#: src/settings-alerts.php:365
+#: src/settings-alerts.php:364
 #, php-format
 msgid "Maximum alerts per hour set to <code>%s</code>"
 msgstr ""
 
-#: src/settings-alerts.php:372
+#: src/settings-alerts.php:371
 msgid "The maximum number of alerts per hour has been updated"
 msgstr ""
 
-#: src/settings-alerts.php:374
+#: src/settings-alerts.php:373
 msgid "Error updating the maximum number of alerts per hour"
 msgstr ""
 
-#: src/settings-alerts.php:398
+#: src/settings-alerts.php:397
 msgid "30 failed logins per hour"
 msgstr ""
 
-#: src/settings-alerts.php:399
+#: src/settings-alerts.php:398
 msgid "60 failed logins per hour"
 msgstr ""
 
-#: src/settings-alerts.php:400
+#: src/settings-alerts.php:399
 msgid "120 failed logins per hour"
 msgstr ""
 
-#: src/settings-alerts.php:401
+#: src/settings-alerts.php:400
 msgid "240 failed logins per hour"
 msgstr ""
 
-#: src/settings-alerts.php:402
+#: src/settings-alerts.php:401
 msgid "480 failed logins per hour"
 msgstr ""
 
 #. translators: %s: number of failed logins
-#: src/settings-alerts.php:413
+#: src/settings-alerts.php:412
 #, php-format
 msgid "Consider brute-force attack after <code>%s</code> failed logins per hour"
 msgstr ""
 
 #. translators: %s: number of failed logins
-#: src/settings-alerts.php:422
+#: src/settings-alerts.php:421
 #, php-format
 msgid "The plugin will assume that your website is under a brute-force attack after %s failed logins are detected during the same hour"
 msgstr ""
 
-#: src/settings-alerts.php:426
+#: src/settings-alerts.php:425
 msgid "Invalid number of failed logins per hour"
 msgstr ""
 
-#: src/settings-alerts.php:451
+#: src/settings-alerts.php:450
 msgid "Receive email alerts for changes in the settings of the plugin"
 msgstr ""
 
-#: src/settings-alerts.php:452
+#: src/settings-alerts.php:451
 msgid "Receive email alerts in HTML <em>(there may be issues with some mail services)</em>"
 msgstr ""
 
-#: src/settings-alerts.php:453
+#: src/settings-alerts.php:452
 msgid "Use WordPress functions to send mails <em>(uncheck to use native PHP functions)</em>"
 msgstr ""
 
-#: src/settings-alerts.php:454
+#: src/settings-alerts.php:453
 msgid "Allow redirection after login to report the last-login information"
 msgstr ""
 
-#: src/settings-alerts.php:455
+#: src/settings-alerts.php:454
 msgid "Receive email alerts for core integrity checks"
 msgstr ""
 
-#: src/settings-alerts.php:456
+#: src/settings-alerts.php:455
 msgid "Receive email alerts for available updates"
 msgstr ""
 
-#: src/settings-alerts.php:457
+#: src/settings-alerts.php:456
 msgid "Receive email alerts for new user registration"
 msgstr ""
 
-#: src/settings-alerts.php:458
+#: src/settings-alerts.php:457
 msgid "Receive email alerts for successful login attempts"
 msgstr ""
 
-#: src/settings-alerts.php:459
+#: src/settings-alerts.php:458
 msgid "Receive email alerts for failed login attempts <em>(you may receive tons of emails)</em>"
 msgstr ""
 
-#: src/settings-alerts.php:460
+#: src/settings-alerts.php:459
 msgid "Receive email alerts for password guessing attacks <em>(summary of failed logins per hour)</em>"
 msgstr ""
 
-#: src/settings-alerts.php:461
+#: src/settings-alerts.php:460
 msgid "Receive email alerts for changes in the post status <em>(configure from Ignore Posts Changes)</em>"
 msgstr ""
 
-#: src/settings-alerts.php:462
+#: src/settings-alerts.php:461
 msgid "Receive email alerts when the WordPress version is updated"
 msgstr ""
 
-#: src/settings-alerts.php:463
+#: src/settings-alerts.php:462
 msgid "Receive email alerts when your website settings are updated"
 msgstr ""
 
-#: src/settings-alerts.php:464
+#: src/settings-alerts.php:463
 msgid "Receive email alerts when a file is modified with theme/plugin editor"
 msgstr ""
 
-#: src/settings-alerts.php:465
+#: src/settings-alerts.php:464
 msgid "Receive email alerts when a <b>plugin is installed</b>"
 msgstr ""
 
-#: src/settings-alerts.php:466
+#: src/settings-alerts.php:465
 msgid "Receive email alerts when a <b>plugin is activated</b>"
 msgstr ""
 
-#: src/settings-alerts.php:467
+#: src/settings-alerts.php:466
 msgid "Receive email alerts when a <b>plugin is deactivated</b>"
 msgstr ""
 
-#: src/settings-alerts.php:468
+#: src/settings-alerts.php:467
 msgid "Receive email alerts when a <b>plugin is updated</b>"
 msgstr ""
 
-#: src/settings-alerts.php:469
+#: src/settings-alerts.php:468
 msgid "Receive email alerts when a <b>plugin is deleted</b>"
 msgstr ""
 
-#: src/settings-alerts.php:470
+#: src/settings-alerts.php:469
 msgid "Receive email alerts when a <b>widget is added</b> to a sidebar"
 msgstr ""
 
-#: src/settings-alerts.php:471
+#: src/settings-alerts.php:470
 msgid "Receive email alerts when a <b>widget is deleted</b> from a sidebar"
 msgstr ""
 
-#: src/settings-alerts.php:472
+#: src/settings-alerts.php:471
 msgid "Receive email alerts when a <b>theme is installed</b>"
 msgstr ""
 
-#: src/settings-alerts.php:473
+#: src/settings-alerts.php:472
 msgid "Receive email alerts when a <b>theme is activated</b>"
 msgstr ""
 
-#: src/settings-alerts.php:474
+#: src/settings-alerts.php:473
 msgid "Receive email alerts when a <b>theme is updated</b>"
 msgstr ""
 
-#: src/settings-alerts.php:475
+#: src/settings-alerts.php:474
 msgid "Receive email alerts when a <b>theme is deleted</b>"
 msgstr ""
 
 #. translators: %s: number of events
-#: src/settings-alerts.php:521
+#: src/settings-alerts.php:520
 #, php-format
 msgid "A total of %s alert events were changed"
 msgstr ""
 
-#: src/settings-alerts.php:527
+#: src/settings-alerts.php:526
 msgid "The alert settings have been updated"
 msgstr ""
 
-#: src/settings-alerts.php:601
+#: src/settings-alerts.php:600
 msgid "Only lowercase letters, numbers, underscores and hyphens are allowed. Post Types cannot exceed 20 characters as well."
 msgstr ""
 
-#: src/settings-alerts.php:603
+#: src/settings-alerts.php:602
 msgid "The post-type is already being ignored (duplicate)."
 msgstr ""
 
-#: src/settings-alerts.php:607
+#: src/settings-alerts.php:606
 msgid "Post-type has been successfully ignored."
 msgstr ""
 
 #. translators: %s: post or page type (e.g. post, page, attachment)
-#: src/settings-alerts.php:610
+#: src/settings-alerts.php:609
 #, php-format
 msgid "Changes in <code>%s</code> post-type will be ignored"
 msgstr ""
 
-#: src/settings-alerts.php:625
+#: src/settings-alerts.php:624
 msgid "List of monitored post-types has been updated."
 msgstr ""
 
-#: src/settings-alerts.php:627
+#: src/settings-alerts.php:626
 msgid "List of monitored post-types has been updated"
 msgstr ""
 
-#: src/settings-alerts.php:634
+#: src/settings-alerts.php:633
 #: src/settings-scanner.php:187
 #: src/settings-scanner.php:248
 #: src/strings.php:53
@@ -1829,7 +1829,7 @@ msgstr ""
 #: src/settings-headers.php:439
 #: src/settings-integrity.php:82
 #: src/strings.php:778
-#: src/topt.lib.php:1067
+#: src/topt.lib.php:1241
 msgid "Enabled"
 msgstr ""
 
@@ -1851,7 +1851,7 @@ msgstr ""
 #: src/settings-headers.php:395
 #: src/settings-headers.php:439
 #: src/strings.php:779
-#: src/topt.lib.php:1068
+#: src/topt.lib.php:1242
 msgid "Disabled"
 msgstr ""
 
@@ -3546,7 +3546,7 @@ msgid "The plugin scans your entire website looking for changes which are later 
 msgstr ""
 
 #: src/strings.php:623
-msgid "The scanner uses the <a href=\"http://php.net/manual/en/class.splfileobject.php\" target=\"_blank\" rel=\"noopener\">PHP SPL library</a> and the <a target=\"_blank\" href=\"http://php.net/manual/en/class.filesystemiterator.php\" rel=\"noopener\">Filesystem Iterator</a> class to scan the directory tree where your website is located in the server. This library is only available on PHP 5 >= 5.3.0 &mdash; OR &mdash; PHP 7; if you have an older version of PHP the plugin will not work as expected. Please ask your hosting provider to advise you on this matter."
+msgid "The scanner uses the <a href=\"http://php.net/manual/en/class.splfileobject.php\" target=\"_blank\" rel=\"noopener\">PHP SPL library</a> and the <a target=\"_blank\" href=\"http://php.net/manual/en/class.filesystemiterator.php\" rel=\"noopener\">Filesystem Iterator</a> class to scan the directory tree where your website is located in the server. This library requires PHP 7.4 or greater; if you have an older version of PHP the plugin will not work as expected. Please ask your hosting provider to advise you on this matter."
 msgstr ""
 
 #: src/strings.php:627
@@ -3866,7 +3866,7 @@ msgid "Click \"Setup\" to activate."
 msgstr ""
 
 #: src/strings.php:833
-#: src/topt.lib.php:1330
+#: src/topt.lib.php:1566
 msgid "Two-Factor Authentication is enabled for your account."
 msgstr ""
 
@@ -3879,7 +3879,7 @@ msgid "Setup"
 msgstr ""
 
 #: src/strings.php:838
-#: src/topt.lib.php:1290
+#: src/topt.lib.php:1526
 msgid "Two-Factor Authentication is already enabled for your account."
 msgstr ""
 
@@ -3891,167 +3891,179 @@ msgstr ""
 msgid "Invalid template type"
 msgstr ""
 
-#: src/topt.lib.php:565
+#: src/topt.lib.php:628
 msgid "Unable to initialize two-factor setup."
 msgstr ""
 
-#: src/topt.lib.php:613
+#: src/topt.lib.php:676
 msgid "Invalid two-factor authentication code."
 msgstr ""
 
-#: src/topt.lib.php:652
-msgid "Enter the 6-digit code from your authenticator app to continue."
-msgstr ""
-
-#: src/topt.lib.php:701
-msgid "Invalid code. Make sure you scanned the QR and your device time is correct."
+#: src/topt.lib.php:717
+msgid "Invalid backup code."
 msgstr ""
 
 #: src/topt.lib.php:725
+msgid "Enter the 6-digit code from your authenticator app or an 8-character backup code to continue."
+msgstr ""
+
+#: src/topt.lib.php:774
+msgid "Invalid code. Make sure you scanned the QR and your device time is correct."
+msgstr ""
+
+#: src/topt.lib.php:798
 msgid "Set up two-factor authentication. Scan the QR code with your authenticator app, then enter the 6-digit code to continue."
 msgstr ""
 
-#: src/topt.lib.php:734
+#: src/topt.lib.php:807
 msgid "Set up Two-Factor Authentication"
 msgstr ""
 
-#: src/topt.lib.php:968
-#: src/topt.lib.php:1014
+#: src/topt.lib.php:1142
+#: src/topt.lib.php:1188
 msgid "Please enter the 6-digit verification code."
 msgstr ""
 
-#: src/topt.lib.php:973
+#: src/topt.lib.php:1147
 msgid "Invalid secret. Reload the page and try again."
 msgstr ""
 
-#: src/topt.lib.php:993
-#: src/topt.lib.php:1036
+#: src/topt.lib.php:1167
+#: src/topt.lib.php:1210
 msgid "Incorrect code. Check your authenticator app and device time."
 msgstr ""
 
-#: src/topt.lib.php:1018
+#: src/topt.lib.php:1192
 msgid "Invalid secret."
 msgstr ""
 
-#: src/topt.lib.php:1025
+#: src/topt.lib.php:1199
 msgid "Verification failed."
 msgstr ""
 
-#: src/topt.lib.php:1089
+#: src/topt.lib.php:1263
 msgid "Two-Factor is not enabled for this user. Ask the user to enable it from their own Profile page."
 msgstr ""
 
-#: src/topt.lib.php:1119
+#: src/topt.lib.php:1293
 msgid "You can only enable two-factor for your own account."
 msgstr ""
 
-#: src/topt.lib.php:1220
+#: src/topt.lib.php:1389
+msgid "You can only regenerate backup codes for your own account."
+msgstr ""
+
+#: src/topt.lib.php:1396
+msgid "Two-Factor must be enabled before generating backup codes."
+msgstr ""
+
+#: src/topt.lib.php:1449
 msgid "Two-Factor is not enforced for your account."
 msgstr ""
 
-#: src/topt.lib.php:1227
+#: src/topt.lib.php:1456
 msgid "Two-Factor is already enabled."
 msgstr ""
 
-#: src/topt.lib.php:1277
-#: src/topt.lib.php:1954
+#: src/topt.lib.php:1513
+#: src/topt.lib.php:2197
 msgid "Incorrect nonce."
 msgstr ""
 
-#: src/topt.lib.php:1283
-#: src/topt.lib.php:1323
-#: src/topt.lib.php:1960
+#: src/topt.lib.php:1519
+#: src/topt.lib.php:1559
+#: src/topt.lib.php:2203
 msgid "Incorrect user."
 msgstr ""
 
-#: src/topt.lib.php:1297
-#: src/topt.lib.php:1337
+#: src/topt.lib.php:1533
+#: src/topt.lib.php:1573
 msgid "Unable to generate secret."
 msgstr ""
 
-#: src/topt.lib.php:1398
+#: src/topt.lib.php:1634
 msgid "You are not allowed to list users."
 msgstr ""
 
-#: src/topt.lib.php:1563
+#: src/topt.lib.php:1803
 msgid "Enforced / not active"
 msgstr ""
 
-#: src/topt.lib.php:1589
+#: src/topt.lib.php:1829
 msgid "Activate two factor for all users"
 msgstr ""
 
-#: src/topt.lib.php:1590
+#: src/topt.lib.php:1830
 msgid "Activate two factor for selected users"
 msgstr ""
 
-#: src/topt.lib.php:1591
+#: src/topt.lib.php:1831
 msgid "Deactivate two factor for all users"
 msgstr ""
 
-#: src/topt.lib.php:1592
+#: src/topt.lib.php:1832
 msgid "Deactivate two factor for selected users"
 msgstr ""
 
-#: src/topt.lib.php:1593
+#: src/topt.lib.php:1833
 msgid "Reset two factor for selected users (keep enforcement)"
 msgstr ""
 
-#: src/topt.lib.php:1594
+#: src/topt.lib.php:1834
 msgid "Reset two factor for all users (keep enforcement)"
 msgstr ""
 
-#: src/topt.lib.php:1595
+#: src/topt.lib.php:1835
 msgid "Delete all two-factor data and disable enforcement"
 msgstr ""
 
-#: src/topt.lib.php:1622
+#: src/topt.lib.php:1862
 msgid "Activated for all users"
 msgstr ""
 
-#: src/topt.lib.php:1625
+#: src/topt.lib.php:1865
 msgid "Activated for some users"
 msgstr ""
 
-#: src/topt.lib.php:1782
+#: src/topt.lib.php:2022
 msgid "You are not allowed to modify Two-Factor settings."
 msgstr ""
 
-#: src/topt.lib.php:1798
+#: src/topt.lib.php:2038
 msgid "Two-Factor enforced for all users."
 msgstr ""
 
-#: src/topt.lib.php:1808
+#: src/topt.lib.php:2048
 msgid "Two-Factor deactivated for all users."
 msgstr ""
 
-#: src/topt.lib.php:1815
-#: src/topt.lib.php:1833
-#: src/topt.lib.php:1874
+#: src/topt.lib.php:2055
+#: src/topt.lib.php:2073
+#: src/topt.lib.php:2114
 msgid "No users selected."
 msgstr ""
 
-#: src/topt.lib.php:1826
+#: src/topt.lib.php:2066
 msgid "Two-Factor enforced for selected users."
 msgstr ""
 
-#: src/topt.lib.php:1868
+#: src/topt.lib.php:2108
 msgid "Two-Factor deactivated for selected users."
 msgstr ""
 
-#: src/topt.lib.php:1885
+#: src/topt.lib.php:2126
 msgid "Two-Factor settings reset for selected users."
 msgstr ""
 
-#: src/topt.lib.php:1908
+#: src/topt.lib.php:2150
 msgid "Two-Factor settings reset for all users."
 msgstr ""
 
-#: src/topt.lib.php:1926
+#: src/topt.lib.php:2169
 msgid "All Two-Factor data deleted and enforcement disabled."
 msgstr ""
 
-#: src/topt.lib.php:1932
+#: src/topt.lib.php:2175
 msgid "Invalid two-factor action selected."
 msgstr ""
 
@@ -4147,6 +4159,6 @@ msgstr ""
 msgid "Your WordPress install is following <a href=\"https://sucuri.net/guides/wordpress-security\" target=\"_blank\" rel=\"noopener\">the security best practices</a>."
 msgstr ""
 
-#: sucuri.php:359
+#: sucuri.php:362
 msgid "Sucuri plugin has been uninstalled"
 msgstr ""
