@@ -990,6 +990,7 @@ class SucuriScanEvent extends SucuriScan
 
         if (empty($wp_hasher)) {
             require_once ABSPATH . WPINC . '/class-phpass.php';
+            // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- lazily populating $wp_hasher is how core itself primes it.
             $wp_hasher = PasswordHash(8, true);
         }
 

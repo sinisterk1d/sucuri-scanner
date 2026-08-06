@@ -358,7 +358,7 @@ class SucuriScanSiteCheck extends SucuriScanAPI
     public static function recommendations()
     {
         $data = self::scanAndCollectData();
-  
+
         if (!isset($data['RECOMMENDATIONS'])) {
             return;
         }
@@ -381,7 +381,7 @@ class SucuriScanSiteCheck extends SucuriScanAPI
                 )
             );
         }
-        
+
         return SucuriScanTemplate::getSection('sitecheck-recommendations', $params);
     }
 

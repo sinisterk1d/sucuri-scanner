@@ -20,4 +20,5 @@
 /playwright.config.ts export-ignore
 /tsconfig.json export-ignore
 /Makefile export-ignore
+/phpcs.xml export-ignore
 /phpunit.xml export-ignore

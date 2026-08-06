@@ -1,6 +1,6 @@
 #!/bin/sh
 
-.PHONY: e2e e2e-start e2e-reset e2e-setup e2e-install e2e-test e2e-features e2e-mutations e2e-ui unit-test update-translations git-archive
+.PHONY: e2e e2e-start e2e-reset e2e-setup e2e-install e2e-test e2e-features e2e-mutations e2e-ui unit-test update-translations git-archive lint lint-fix
 
 # Normal runs preserve the existing tests environment and hold the workspace lock.
 e2e:
@@ -46,3 +46,11 @@ update-translations:
 
 git-archive:
 	git archive -o ~/Desktop/sucuri-scanner.zip HEAD
+
+# Check the coding standard defined in phpcs.xml.
+lint:
+	./vendor/bin/phpcs
+
+# Apply the auto-fixable subset of the coding standard.
+lint-fix:
+	./vendor/bin/phpcbf

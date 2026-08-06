@@ -47,10 +47,10 @@ class SucuriScanTwoFactor extends SucuriScan
 
     /**
      * Adds an error to be displayed on the user profile page.
-     * 
+     *
      * @param mixed $code
      * @param mixed $message
-     * 
+     *
      * @return void
      */
     protected static function add_profile_error($code, $message)
@@ -205,9 +205,9 @@ class SucuriScanTwoFactor extends SucuriScan
 
     /**
      * This function enqueues the necessary assets for the user profile page if 2FA is enforced.
-     * 
+     *
      * @param mixed $hook
-     * 
+     *
      * @return void
      */
     public static function enqueue_profile_assets($hook)
@@ -272,7 +272,7 @@ class SucuriScanTwoFactor extends SucuriScan
 
     /**
      * This function retrieves the login session data associated with a given token.
-     * 
+     *
      * @param mixed $token
      */
     protected static function get_login_session($token)
@@ -298,10 +298,10 @@ class SucuriScanTwoFactor extends SucuriScan
 
     /**
      * This function updates the login session associated with a given token.
-     * 
+     *
      * @param mixed $token
      * @param mixed $data
-     * 
+     *
      * @return void
      */
     protected static function update_login_session($token, $data)
@@ -422,7 +422,7 @@ class SucuriScanTwoFactor extends SucuriScan
      * Extract and normalize a submitted numeric TOTP code from POST.
      * Returns empty string if absent.
      * @param string $field
-     * 
+     *
      * @return string
      */
     protected static function extract_submitted_code($field)
@@ -569,16 +569,16 @@ class SucuriScanTwoFactor extends SucuriScan
 
     /*
      * WordPress calls the 'authenticate' filter multiple times during the login pipeline.
-     * 
+     *
      * We only act when:
      *   - A previous authentication step has produced a concrete WP_User instance; AND
      *   - There is a non-empty username credential (protects against cookie/interim flows where username may be blank);
      *   - Two-Factor enforcement policy applies to this user.
-     * 
+     *
      * @param mixed $user
      * @param mixed $username
      * @param mixed $password
-     * 
+     *
      * @return mixed WP_User instance on success, WP_Error on failure, or original $user to pass through.
      */
     public static function authenticate($user, $username, $password)
@@ -747,7 +747,7 @@ class SucuriScanTwoFactor extends SucuriScan
 
     /*
      * Render the 2FA setup form.
-     * 
+     *
      * @return void
      */
     public static function login_form_2fa_setup()
@@ -1124,7 +1124,7 @@ class SucuriScanTwoFactor extends SucuriScan
      *  - Code length check
      *  - Secret format validation
      *  - TOTP computation + replay prevention (LAST_SUCCESS_META_KEY)
-     * 
+     *
      * Does NOT throw/exit; caller decides how to surface errors.
      *
      * @param int $user_id
@@ -1215,7 +1215,7 @@ class SucuriScanTwoFactor extends SucuriScan
 
     /**
      * This function saves the user's 2FA settings when their profile is updated.
-     * 
+     *
      * @param WP_User $user
      *
      * @return void
@@ -1276,7 +1276,7 @@ class SucuriScanTwoFactor extends SucuriScan
     /**
      * AJAX handler to enable 2FA for a user.
      * Expects POST with: user_id (int, optional), code (string, required), secret (string, required), nonce (string, required).
-     * 
+     *
      * @return void (sends JSON response and exits)
      */
     public static function ajax_profile_enable()
@@ -1411,7 +1411,7 @@ class SucuriScanTwoFactor extends SucuriScan
 
     /**
      * Process and save 2FA settings when a user profile is updated.
-     * 
+     *
      * @param int $user_id
      *
      * @return void
@@ -1504,7 +1504,7 @@ class SucuriScanTwoFactor extends SucuriScan
 
     /**
      * Render the 2FA setup block for the current user via AJAX.
-     * 
+     *
      * @return string HTML (error message if not logged in or other failure).
      */
     public static function topt()
@@ -1548,7 +1548,7 @@ class SucuriScanTwoFactor extends SucuriScan
 
     /**
      * Render the 2FA block for the current user profile page.
-     * 
+     *
      * @return string HTML (error message if not logged in or other failure).
      */
     public static function current_user_block()
@@ -1737,17 +1737,21 @@ class SucuriScanTwoFactor extends SucuriScan
      */
     protected static function get_users_search_term()
     {
-        // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+        /*
+         * Read the term raw: the nonce and the list_users capability are checked by
+         * the caller (ajaxUsersList()), and the value is unslashed, sanitized and
+         * length-bounded immediately below. See the doc block above for the full
+         * reasoning on why sanitize_text_field() cannot run any earlier.
+         */
+        // phpcs:disable WordPress.Security.NonceVerification, WordPress.Security.ValidatedSanitizedInput
         if (isset($_POST['twofactor_search'])) {
-            // phpcs:ignore WordPress.Security.NonceVerification.Missing
             $raw = $_POST['twofactor_search'];
-            // phpcs:ignore WordPress.Security.NonceVerification.Recommended
         } elseif (isset($_GET['twofactor_search'])) {
-            // phpcs:ignore WordPress.Security.NonceVerification.Recommended
             $raw = $_GET['twofactor_search'];
         } else {
             return '';
         }
+        // phpcs:enable WordPress.Security.NonceVerification, WordPress.Security.ValidatedSanitizedInput
 
         if (!is_scalar($raw)) {
             return '';
@@ -2180,7 +2184,7 @@ class SucuriScanTwoFactor extends SucuriScan
      * Expects POST with: form_action=totp_verify, topt_code (string, required),
      *  topt_key (string, required if no existing key), enforce_all (0|1, optional),
      *  _wpnonce (string, required).
-     * 
+     *
      * @return void (sends JSON response and exits)
      */
     public static function totp_verify()

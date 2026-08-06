@@ -1,0 +1,142 @@
+<?xml version="1.0"?>
+<ruleset name="Sucuri Security">
+    <description>
+        Coding standard for the Sucuri Security plugin.
+
+        This is an explicit allowlist of sniffs rather than a blanket import of the
+        WordPress standard. The plugin predates WPCS by several years and does not
+        follow WordPress core formatting (it uses four-space indentation, no
+        namespaces, and a static "class-as-namespace" layout); importing WordPress
+        wholesale reports ~19,000 violations, which is a gate nobody can act on.
+
+        What is enforced here is the subset that catches defects rather than taste:
+        escaping, input validation, nonce handling, SQL preparation, deprecated WP
+        APIs, i18n correctness, and the formatting rules the codebase already keeps.
+        Everything listed is green as of 2.7.5, so any violation is a regression
+        introduced by the change under review.
+
+        Deliberately NOT enforced, with reasons:
+
+        - Generic.Files.LineLength .............. long doc blocks and API strings.
+        - Tabs/indentation and brace placement .. WPCS wants tabs; this codebase
+                                                  uses four spaces throughout.
+        - PSR1 namespaces / side effects /
+          CamelCapsMethodName ................... architectural: a procedural
+                                                  bootstrap plus static classes,
+                                                  with mixed snake_case history.
+        - WordPress.PHP.NoSilencedErrors ........ a file integrity scanner walks
+          WordPress.WP.AlternativeFunctions ..... paths it does not control and must
+                                                  read them directly rather than
+                                                  through WP_Filesystem; both are
+                                                  intentional and pervasive.
+        - WordPress.PHP.StrictInArray ........... pre-existing, advisory only.
+        - Squiz.Operators.IncrementDecrementUsage  pure preference, no defect value.
+        - OpeningFunctionBraceBsdAllman ......... same, and its auto-fixer emits
+                                                  broken indentation in the
+                                                  tab-indented test files and in
+                                                  closures.
+
+        Run with `make lint`; `make lint-fix` applies the auto-fixable subset.
+    </description>
+
+    <!-- Scan the plugin bootstrap, the library, and the unit tests. -->
+    <file>sucuri.php</file>
+    <file>src</file>
+    <file>tests</file>
+
+    <!-- Generated data-storage files written by the plugin during tests. -->
+    <exclude-pattern>tests/fixtures/*</exclude-pattern>
+
+    <arg name="extensions" value="php"/>
+    <arg name="basepath" value="."/>
+    <arg name="parallel" value="8"/>
+    <arg name="colors"/>
+    <!-- s: show sniff codes so a failure names the rule to fix or annotate. -->
+    <arg value="sp"/>
+
+    <!-- Floors declared in sucuri.php and readme.txt; the deprecation sniffs
+         below only report APIs removed at or before these versions. -->
+    <config name="minimum_wp_version" value="6.0"/>
+    <config name="testVersion" value="7.4-"/>
+
+    <!--
+        Security.
+
+        The request-handling sniffs apply to production code only. Unit tests
+        populate $_POST/$_GET and $GLOBALS by design to drive the handlers under
+        test, and echo raw values when asserting on rendered output; running these
+        sniffs over tests/ reports that intent as a defect.
+    -->
+    <rule ref="WordPress.Security.EscapeOutput">
+        <exclude-pattern>tests/*</exclude-pattern>
+    </rule>
+    <rule ref="WordPress.Security.NonceVerification">
+        <exclude-pattern>tests/*</exclude-pattern>
+    </rule>
+    <rule ref="WordPress.Security.ValidatedSanitizedInput">
+        <exclude-pattern>tests/*</exclude-pattern>
+    </rule>
+    <rule ref="WordPress.WP.GlobalVariablesOverride">
+        <exclude-pattern>tests/*</exclude-pattern>
+    </rule>
+    <rule ref="WordPress.Security.SafeRedirect"/>
+    <rule ref="WordPress.Security.PluginMenuSlug"/>
+    <rule ref="WordPress.DB.PreparedSQL"/>
+    <rule ref="WordPress.DB.PreparedSQLPlaceholders"/>
+    <rule ref="WordPress.DB.DirectDatabaseQuery"/>
+    <rule ref="WordPress.PHP.IniSet"/>
+    <rule ref="Squiz.PHP.Eval"/>
+    <rule ref="Generic.PHP.BacktickOperator"/>
+
+    <!--
+        Correctness.
+    -->
+    <rule ref="Generic.PHP.Syntax"/>
+    <rule ref="Generic.CodeAnalysis.EmptyStatement"/>
+    <rule ref="Generic.CodeAnalysis.ForLoopShouldBeWhileLoop"/>
+    <rule ref="Generic.CodeAnalysis.JumbledIncrementer"/>
+    <rule ref="Generic.CodeAnalysis.UnconditionalIfStatement"/>
+    <rule ref="Generic.CodeAnalysis.UselessOverridingMethod"/>
+    <rule ref="Generic.ControlStructures.InlineControlStructure"/>
+    <rule ref="Squiz.PHP.DisallowSizeFunctionsInLoops"/>
+    <rule ref="WordPress.CodeAnalysis.AssignmentInTernaryCondition"/>
+    <rule ref="WordPress.CodeAnalysis.EscapedNotTranslated"/>
+    <rule ref="WordPress.WP.Capabilities"/>
+    <rule ref="WordPress.WP.PostsPerPage"/>
+    <rule ref="WordPress.WP.DeprecatedFunctions"/>
+    <rule ref="WordPress.WP.DeprecatedParameters"/>
+    <rule ref="WordPress.WP.DeprecatedClasses"/>
+
+    <!--
+        Internationalisation. Every translatable string must carry the plugin's
+        own text domain, or it silently drops out of lang/sucuri-scanner.pot.
+    -->
+    <rule ref="WordPress.WP.I18n">
+        <properties>
+            <property name="text_domain" type="array">
+                <element value="sucuri-scanner"/>
+            </property>
+        </properties>
+    </rule>
+
+    <!--
+        Formatting the codebase already follows.
+    -->
+    <rule ref="Generic.PHP.DisallowShortOpenTag"/>
+    <rule ref="Generic.PHP.LowerCaseKeyword"/>
+    <rule ref="Generic.PHP.LowerCaseConstant"/>
+    <rule ref="Generic.PHP.LowerCaseType"/>
+    <rule ref="Generic.NamingConventions.UpperCaseConstantName"/>
+    <rule ref="Generic.Formatting.DisallowMultipleStatements"/>
+    <rule ref="Generic.WhiteSpace.IncrementDecrementSpacing"/>
+    <rule ref="Generic.Files.ByteOrderMark"/>
+    <rule ref="Generic.Files.LineEndings">
+        <properties>
+            <property name="eolChar" value="\n"/>
+        </properties>
+    </rule>
+    <rule ref="Squiz.WhiteSpace.SuperfluousWhitespace"/>
+    <rule ref="Squiz.Scope.MethodScope"/>
+    <rule ref="PSR2.Files.EndFileNewline"/>
+    <rule ref="PSR2.Classes.PropertyDeclaration"/>
+</ruleset>
