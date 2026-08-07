@@ -3,12 +3,11 @@
 # Verify that the wordpress.org build ships exactly what it should.
 #
 # .gitattributes is a denylist: a path ships unless someone remembers to add an
-# "export-ignore" line for it. Forgetting is silent — the file simply appears in
-# the published zip. CLAUDE.md was added to the repository after 2.7.4 and was on
-# its way into the 2.7.5 build for exactly that reason. This turns the denylist
-# into an enforced allowlist: anything new at the top level has to be either
-# shipped on purpose or ignored on purpose, and either way somebody has to edit
-# this list to say which.
+# "export-ignore" line for it. Forgetting is silent and nothing fails — the file
+# just turns up in the published zip, and the first person to notice is whoever
+# reads the release. This turns the denylist into an enforced allowlist: anything
+# new at the top level has to be either shipped on purpose or ignored on purpose,
+# and either way somebody has to edit this list to say which.
 #
 # It also catches the opposite mistake, an export-ignore rule that is too broad
 # and drops a directory the plugin needs at runtime.

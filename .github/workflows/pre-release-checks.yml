@@ -68,21 +68,24 @@ jobs:
   # a compromised build dependency is a credential problem rather than only a
   # broken build.
   #
-  # Advisory on push and pull request, blocking on a release.
+  # Runs at release time only.
   #
   # This job can go red without anyone touching the code, when an advisory is
   # published against something already in the lock file. On a pull request that
-  # is somebody else's news and should not stand between an unrelated change and
-  # review, so the run is allowed to pass with the job reported as failed. At
-  # release time the same finding does matter, because publishing is what puts
-  # the dependency in front of the credentials, so there it stops the deploy.
+  # is somebody else's news, and it has no bearing on whether the change under
+  # review is sound, so it does not run there at all rather than sitting in the
+  # checks list as noise somebody has to learn to ignore.
+  #
+  # At release time the same finding does matter, because publishing is what puts
+  # the dependency tree in front of the wordpress.org credentials and there is no
+  # reviewer left to make the call, so there it blocks the deploy.
   #
   # release-tag is empty on push and pull_request, and set only when the deploy
-  # workflow calls this one.
+  # workflow calls this one, so this is skipped everywhere except a release.
   dependency-audit:
     name: Dependency audit
     runs-on: ubuntu-latest
-    continue-on-error: ${{ inputs.release-tag == '' }}
+    if: inputs.release-tag != ''
 
     steps:
       - name: Checkout the repository
