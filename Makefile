@@ -1,6 +1,6 @@
 #!/bin/sh
 
-.PHONY: e2e e2e-start e2e-reset e2e-setup e2e-install e2e-test e2e-features e2e-mutations e2e-ui unit-test update-translations git-archive
+.PHONY: e2e e2e-start e2e-reset e2e-setup e2e-install e2e-test e2e-features e2e-mutations e2e-ui unit-test update-translations git-archive lint lint-fix check-version check-dist check-release
 
 # Normal runs preserve the existing tests environment and hold the workspace lock.
 e2e:
@@ -46,3 +46,24 @@ update-translations:
 
 git-archive:
 	git archive -o ~/Desktop/sucuri-scanner.zip HEAD
+
+# Check the coding standard defined in phpcs.xml.
+lint:
+	./vendor/bin/phpcs
+
+# Apply the auto-fixable subset of the coding standard.
+lint-fix:
+	./vendor/bin/phpcbf
+
+# Confirm the four plugin version strings agree.
+check-version:
+	sh tests/check-version-consistency.sh
+
+# Confirm the wordpress.org build ships exactly the expected paths. Reads the
+# last commit, not the working tree, because export-ignore only applies to what
+# git archive can see.
+check-dist:
+	sh tests/check-dist-manifest.sh
+
+# Everything the pre-release workflow gates a release on, minus the unit tests.
+check-release: lint check-version check-dist

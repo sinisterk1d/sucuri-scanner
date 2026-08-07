@@ -224,6 +224,7 @@ class SucuriScanFileInfo extends SucuriScan
                 } else {
                     $objects = new DirectoryIterator($directory);
                 }
+            // phpcs:ignore Generic.CodeAnalysis.EmptyStatement.DetectedCatch -- an unreadable directory is skipped, not an error.
             } catch (RuntimeException $exception) {
                 /* ignore failure */
             }

@@ -23,7 +23,7 @@ final class TotpCalcTest extends TestCase
      *    the last 6 digits of each published 8-digit result.
      *
      * Times from Appendix B: 59, 1111111109, 1111111111, 1234567890, 2000000000, 20000000000.
-     * See: RFC 6238 Appendix B test vectors. 
+     * See: RFC 6238 Appendix B test vectors.
      */
     public function testCalcTotp_Rfc6238_Sha1_6Digits_Defaults(): void
     {
@@ -152,7 +152,7 @@ final class TotpCalcTest extends TestCase
 
     /**
      * If PHP provides pack('J', ...), our pack64 should match it exactly.
-     * 'J' is unsigned 64-bit big-endian as of PHP 5.6.3+. 
+     * 'J' is unsigned 64-bit big-endian as of PHP 5.6.3+.
      */
     public function testPack64_MatchesPackJ_WhenAvailable(): void
     {

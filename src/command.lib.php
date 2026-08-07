@@ -166,6 +166,7 @@ class SucuriScanCommand extends SucuriScan
                 $cssclass .= "\x20" . SUCURISCAN . '-diff-header';
             } elseif ($number === 3) {
                 $cssclass .= "\x20" . SUCURISCAN . '-diff-header';
+            // phpcs:ignore Generic.CodeAnalysis.EmptyStatement.DetectedElseif -- empty on purpose: it guards $line[0] below.
             } elseif ($line === '') {
                 /* do not touch empty lines */
             } elseif ($line[0] === '-') {

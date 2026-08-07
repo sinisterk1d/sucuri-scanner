@@ -24,4 +24,3 @@ define('ABSPATH', __DIR__ . '/../');
 if (!defined('WPINC')) {
     define('WPINC', 'wp-includes');
 }
-

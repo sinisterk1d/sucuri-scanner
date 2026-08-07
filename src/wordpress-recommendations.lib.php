@@ -135,7 +135,7 @@ class SucuriWordPressRecommendations
                 'role' => 'administrator',
                 'fields' => array('user_login'),
             ));
-        
+
             foreach($allUsers as $user) {
                 if (in_array($user->user_login, $adminUsernames)) {
                     $usersWithAdminLogin[] = $user->user_login;

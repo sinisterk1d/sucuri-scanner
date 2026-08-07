@@ -59,10 +59,10 @@ class SucuriScanTOTP extends SucuriScan
 
     /**
      * This function generates a URL for a QR code that can be scanned by an authenticator app.
-     * 
+     *
      * @param mixed $user
      * @param mixed $secret
-     * 
+     *
      * @return string
      */
     public static function generate_qr_code_url($user, $secret)
@@ -159,12 +159,12 @@ class SucuriScanTOTP extends SucuriScan
 
     /**
      * This function returns the valid tick time for a given authcode and key.
-     * 
+     *
      * If no valid tick time is found, it returns false.
-     * 
+     *
      * @param mixed $key
      * @param mixed $authcode
-     * 
+     *
      * @return bool|float|int
      */
     public static function get_authcode_valid_ticktime($key, $authcode)
@@ -232,7 +232,7 @@ class SucuriScanTOTP extends SucuriScan
      * @param mixed $input
      *
      * @return string
-     * 
+     *
      * @throws Exception if invalid characters are found.
      */
     public static function base32_decode($input)
@@ -244,7 +244,6 @@ class SucuriScanTOTP extends SucuriScan
         $s = strtoupper((string) $input);
         $s = preg_replace('/\s+/', '', $s);
         $s = rtrim($s, '=');
-
 
         if ($s !== '' && !preg_match('/^[A-Z2-7]+$/', $s)) {
             throw new Exception('Invalid characters in Base32 input.');
@@ -307,10 +306,10 @@ class SucuriScanTOTP extends SucuriScan
 
     /**
      * This function sorts numbers by their absolute values.
-     * 
+     *
      * @param mixed $a
      * @param mixed $b
-     * 
+     *
      * @return int
      */
     private static function abssort($a, $b)

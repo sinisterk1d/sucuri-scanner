@@ -10,6 +10,7 @@
 # Files
 /.gitattributes export-ignore
 /.gitignore export-ignore
+/.npmrc export-ignore
 /.wp-env.json export-ignore
 /CLAUDE.md export-ignore
 /composer.json export-ignore
@@ -19,4 +20,5 @@
 /playwright.config.ts export-ignore
 /tsconfig.json export-ignore
 /Makefile export-ignore
+/phpcs.xml export-ignore
 /phpunit.xml export-ignore

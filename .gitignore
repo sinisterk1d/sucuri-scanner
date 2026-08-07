@@ -9,9 +9,10 @@ test-results
 
 .wp-env.override.json
 
-# Agent working files: plans and notes written while a task is in progress.
-# Never committed, and never shipped — anything at the repo root that is not
-# listed in .gitattributes as export-ignore ends up in the wordpress.org build.
+# Agent working files: guidance, plans and notes. Never committed, and never
+# shipped — anything at the repo root that is not listed in .gitattributes as
+# export-ignore ends up in the wordpress.org build.
+CLAUDE.md
 PLAN.md
 MEMORY.md
 
