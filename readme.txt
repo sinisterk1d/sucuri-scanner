@@ -5,7 +5,7 @@ Tags: malware, security, firewall, scan, spam, virus, sucuri, protection, blockl
 Requires at least: 6.0
 Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 2.7.5
+Stable tag: 2.8
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -253,7 +253,7 @@ The best place is to engage us via the [Support Forum](https://wordpress.org/sup
 
 == Upgrade Notice ==
 
-= 2.7.5 =
+= 2.8 =
 This version requires PHP 7.4 and WordPress 6.0 or later. It also adds one-time backup codes for two-factor authentication; if you already had 2FA turned on before upgrading, open your WordPress profile and generate your codes so you are not locked out if you lose your authenticator app.
 
 = 1.8.37 =
@@ -263,7 +263,7 @@ This version removes the API communication service dependency on https://wordpre
 This version adds an option to refresh the malware scan results on demand, as well as several small bug fixes and improvements.
 
 == Changelog ==
-= 2.7.5 =
+= 2.8 =
 * Add one-time backup codes for Two-Factor Authentication. Ten codes are created when 2FA is turned on, any one of them will get you in if you lose your authenticator app, and each code stops working once it has been used. You can generate a fresh set at any time from your WordPress profile.
 * Add a search box and severity, plugin, and theme filters to the Audit Logs page, so you can find a specific event without paging through the whole history. Filtering and paging now happen instantly.
 * Add a one-click CSV download of the complete audit trail, ready for a compliance review, an incident timeline, or an archive before older records age out. Large histories export without slowing the site down.
