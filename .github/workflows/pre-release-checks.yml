@@ -61,24 +61,29 @@ jobs:
       - name: Check distribution manifest
         run: make check-dist
 
-  # Reports known advisories in either dependency tree.
+  # Records the state of both dependency trees at publish time. Informational:
+  # continue-on-error means a finding here cannot hold the release.
   #
-  # None of these packages ship in the plugin, but they execute on developer
-  # machines and on the runner that holds the wordpress.org SVN credentials, so
-  # a compromised build dependency is a credential problem rather than only a
-  # broken build.
+  # This job used to block the deploy, on the reasoning that these packages
+  # execute on the runner holding the wordpress.org SVN credentials, so a
+  # compromised build dependency would be a credential problem rather than only
+  # a broken build. That reasoning does not survive contact with this repository:
   #
-  # Runs at release time only.
+  # - Neither tree ships. composer.json requires nothing but php itself, every
+  #   other PHP package is require-dev, and the build allowlist in
+  #   tests/check-dist-manifest.sh admits no vendor/ and no node_modules/.
+  # - The deploy job never runs them. It is a checkout, the 10up deploy action
+  #   and the asset upload; none of them invokes composer, npm or node.
+  # - Install-time execution, the vector that would actually matter, is already
+  #   closed by ignore-scripts=true in .npmrc.
   #
-  # This job can go red without anyone touching the code, when an advisory is
-  # published against something already in the lock file. On a pull request that
-  # is somebody else's news, and it has no bearing on whether the change under
-  # review is sound, so it does not run there at all rather than sitting in the
-  # checks list as noise somebody has to learn to ignore.
-  #
-  # At release time the same finding does matter, because publishing is what puts
-  # the dependency tree in front of the wordpress.org credentials and there is no
-  # reviewer left to make the call, so there it blocks the deploy.
+  # An advisory here is still real news about the developer toolchain, because
+  # these packages do run on developer machines and on the e2e runner. It just
+  # says nothing about whether the artifact being published is safe, and it
+  # arrives without anyone touching the code, so blocking on it spends a release
+  # at the moment there is least time and no reviewer left to make the call.
+  # dependency-audit.yml runs the same commands weekly and files an issue, which
+  # is where acting on one belongs.
   #
   # release-tag is empty on push and pull_request, and set only when the deploy
   # workflow calls this one, so this is skipped everywhere except a release.
@@ -86,6 +91,7 @@ jobs:
     name: Dependency audit
     runs-on: ubuntu-latest
     if: inputs.release-tag != ''
+    continue-on-error: true
 
     steps:
       - name: Checkout the repository

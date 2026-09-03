@@ -1,0 +1,133 @@
+name: Dependency audit
+
+# Weekly report on known advisories in the PHP and Node dependency trees.
+#
+# Deliberately not a release gate. Neither tree ships in the plugin and neither
+# executes on the runner that holds the wordpress.org credentials, so an advisory
+# here cannot make a published artifact unsafe. The reasoning is written out in
+# full above the dependency-audit job in pre-release-checks.yml.
+#
+# What an advisory here can do is compromise a developer machine or the e2e
+# runner, which is worth fixing but needs time to act rather than a veto on the
+# next publish. So the report runs on a clock rather than on a push, and lands as
+# a single tracking issue rather than a red check somebody learns to ignore.
+#
+# Third-party actions are pinned to a commit SHA rather than a tag, matching the
+# rest of the workflows. The trailing comment on each line records the
+# human-readable version the SHA corresponds to.
+on:
+  schedule:
+    # Mondays, 06:00 UTC. Scheduled runs always use the default branch.
+    - cron: '0 6 * * 1'
+  # So the report can be regenerated on demand once a fix lands, instead of
+  # waiting a week to confirm the issue closes.
+  workflow_dispatch:
+
+# Only what filing the report needs.
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  audit:
+    name: Audit dependencies
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
+        with:
+          php-version: '8.5'
+          tools: composer
+
+      - name: Install NodeJS
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: 22
+
+      # Both read their lock file directly, so neither needs the dependencies to
+      # be installed first.
+      #
+      # Neither command is allowed to fail the step: a finding is the thing being
+      # reported, not a broken run, and the report should cover both trees no
+      # matter which one is dirty.
+      #
+      # npm is held to the same high threshold the release job used. The tree
+      # carries known moderate advisories that were looked at and left in place,
+      # and reporting those would file an issue that never closes and that nobody
+      # is expected to act on.
+      - name: Audit both dependency trees
+        id: audit
+        env:
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -u
+
+          findings=0
+          composer audit --locked > php.txt 2>&1 || findings=1
+          npm audit --audit-level=high > node.txt 2>&1 || findings=1
+
+          {
+            echo 'Weekly audit of the committed lock files. Nothing here blocks a'
+            echo 'release; see the dependency-audit job in pre-release-checks.yml'
+            echo 'for why.'
+            echo
+            echo "Report from $RUN_URL"
+            echo
+            echo '### PHP — `composer audit --locked`'
+            echo
+            echo '```'
+            cat php.txt
+            echo '```'
+            echo
+            echo '### Node — `npm audit --audit-level=high`'
+            echo
+            echo '```'
+            cat node.txt
+            echo '```'
+          } > report.md
+
+          cat report.md
+          echo "findings=$findings" >> "$GITHUB_OUTPUT"
+
+      # One tracking issue, kept current, rather than a fresh issue or a fresh
+      # comment every week. An advisory usually persists across several runs, and
+      # a weekly notification about the same unchanged finding is exactly what
+      # teaches people to mute the notification. The issue being open is the
+      # signal; its body is always the latest report.
+      - name: Update the tracking issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          FINDINGS: ${{ steps.audit.outputs.findings }}
+          LABEL: dependency-audit
+          TITLE: 'Dependency audit: advisories in the lock files'
+        run: |
+          set -eu
+
+          # The label only has to exist; it will not on the first run.
+          gh label create "$LABEL" \
+            --description 'Filed by .github/workflows/dependency-audit.yml' \
+            --color ededed || true
+
+          existing=$(gh issue list --state open --label "$LABEL" --limit 1 \
+            --json number --jq '.[0].number // empty')
+
+          if [ "$FINDINGS" = '1' ]; then
+            if [ -n "$existing" ]; then
+              gh issue edit "$existing" --body-file report.md
+              echo "Updated #$existing."
+            else
+              gh issue create --title "$TITLE" --label "$LABEL" --body-file report.md
+            fi
+          elif [ -n "$existing" ]; then
+            gh issue comment "$existing" \
+              --body 'Both dependency trees are clean as of the latest audit. Closing.'
+            gh issue close "$existing"
+            echo "Closed #$existing."
+          else
+            echo 'Both dependency trees clean, no open report.'
+          fi
