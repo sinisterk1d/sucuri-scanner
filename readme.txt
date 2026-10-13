@@ -266,7 +266,7 @@ This version adds an option to refresh the malware scan results on demand, as we
 = 2.8.2 =
 * Fix successful and failed logins on the Last Logins page being shown hours apart on sites that are not set to UTC. Dates and times across the plugin, including notification emails and the self-hosted log file, now follow the timezone set under Settings > General in WordPress, daylight saving time included, and existing login records are shown correctly without any action on your part.
 * Add a "Use the WordPress timezone" choice to the Timezone Override setting, selected by default. A fixed UTC offset you picked earlier is kept. Sites still on the old UTC+00.00 default are moved to the WordPress timezone once; pick UTC+00.00 again if you want to keep it.
-* Fix the audit log date filters ("Today", "Yesterday", "This Week", custom ranges and so on) matching the wrong day for part of the day on sites that are not set to UTC.
+* Fix the audit log date filters ("Today", "Yesterday", "This Week", custom ranges and so on) matching the previous day on sites with a timezone override behind UTC.
 * Fix audit events that are still waiting to be sent being shown at the wrong time, and at the start of 1970 on sites set to a timezone override such as UTC+12.75.
 
 = 2.8 =

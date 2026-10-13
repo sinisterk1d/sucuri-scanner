@@ -245,9 +245,6 @@ class SucuriScanInterface
             return;
         }
 
-        /* update the version number in the plugin settings. */
-        SucuriScanOption::updateOption(':plugin_version', SUCURISCAN_VERSION);
-
         /**
          * Older versions persisted UTC+00.00 as the timezone default the first
          * time it was read, so it cannot be told apart from a deliberate choice.
@@ -260,6 +257,9 @@ class SucuriScanInterface
         ) {
             SucuriScanOption::updateOption(':timezone', 'wordpress');
         }
+
+        /* update the version number in the plugin settings. */
+        SucuriScanOption::updateOption(':plugin_version', SUCURISCAN_VERSION);
 
         /**
          * Invite website owner to subscribe to our security newsletter.

@@ -506,7 +506,7 @@ __('Submit', 'sucuri-scanner');
 // settings-general-timezone.html.tpl
 __('Timezone Override', 'sucuri-scanner');
 __(
-    'By default the plugin shows every date and time, including the audit logs and the last logins, in the timezone set under Settings &gt; General in WordPress. Pick a fixed UTC offset here only if you want the plugin to use a different timezone than the rest of the website. Fixed offsets do not follow daylight saving time.',
+    'By default the plugin shows every date and time, including the audit logs and the last logins, in the timezone set under Settings > General in WordPress. Pick a fixed UTC offset here only if you want the plugin to use a different timezone than the rest of the website. Fixed offsets do not follow daylight saving time.',
     'sucuri-scanner'
 );
 __('Timezone:', 'sucuri-scanner');

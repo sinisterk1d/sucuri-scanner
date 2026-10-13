@@ -85,11 +85,12 @@ final class TimezoneDefaultTest extends TestCase
     }
 
     /**
-     * Twelve hours behind UTC, UTC midnight is always the previous local day.
+     * An hour behind UTC, UTC midnight is the previous local day; the old code
+     * got "today" wrong for all but the first hour of the UTC day.
      */
     public function testRelativeFiltersUseTheLocalDate()
     {
-        Functions\when('wp_cache_get')->justReturn(array('sucuriscan_timezone' => 'UTC-12.00'));
+        Functions\when('wp_cache_get')->justReturn(array('sucuriscan_timezone' => 'UTC-01.00'));
 
         $today = SucuriScan::datetime(null, 'Y-m-d');
         $filters = SucuriScanAPI::getFilters();
