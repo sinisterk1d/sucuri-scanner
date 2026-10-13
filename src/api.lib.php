@@ -444,8 +444,6 @@ class SucuriScanAPI extends SucuriScanOption
 
     /**
      * Returns the security logs from the system queue.
-     * In case the logs comes from the queue, set key "from_queue" to true,
-     * as the parse function later will need to prevent timezone conflicts.
      *
      * @return array The data structure with the logs.
      */
@@ -468,7 +466,7 @@ class SucuriScanAPI extends SucuriScanOption
                 $time = substr($micro, 0, $offset);
                 $auditlogs[] = sprintf(
                     '%s %s : %s',
-                    SucuriScan::datetime($time, 'Y-m-d H:i:s'),
+                    self::auditLogDatetime($time),
                     SucuriScan::getSiteEmail(),
                     $message
                 );
@@ -482,10 +480,23 @@ class SucuriScanAPI extends SucuriScanOption
             'verbose' => 0,
             'output' => array_reverse($auditlogs),
             'total_entries' => count($auditlogs),
-            'from_queue' => '1',
         );
 
         return self::parseAuditLogs($res, $filters);
+    }
+
+    /**
+     * Formats a timestamp the way the audit logs API does, in Eastern Time, so
+     * queued entries parse back to the same instant as the remote ones.
+     *
+     * @param int|string $timestamp Unix timestamp.
+     * @return string               Date and time as "Y-m-d H:i:s".
+     */
+    public static function auditLogDatetime($timestamp)
+    {
+        return date_create('@' . intval($timestamp))
+            ->setTimezone(new DateTimeZone('America/New_York'))
+            ->format('Y-m-d H:i:s');
     }
 
     /**
@@ -504,6 +515,20 @@ class SucuriScanAPI extends SucuriScanOption
     }
 
     /**
+     * Current site-local wall-clock time as if it were UTC.
+     *
+     * Relative dates like "today" must be worked out on the clock the logs are
+     * shown in, then formatted with gmdate(), or a site behind UTC would get
+     * yesterday's date for part of the day.
+     *
+     * @return int Shifted Unix timestamp.
+     */
+    private static function localNow()
+    {
+        return strtotime(SucuriScan::datetime(null, 'Y-m-d H:i:s') . ' UTC');
+    }
+
+    /**
      * Retrieves the available filters for the audit logs.
      *
      * @return array An associative array containing the filters for the auditlogs.
@@ -511,18 +536,19 @@ class SucuriScanAPI extends SucuriScanOption
     public static function getFilters()
     {
         $format = 'Y-m-d';
+        $now = self::localNow();
 
-        $today = strtotime('today');
-        $yesterday = strtotime('yesterday');
-        $thisWeek = strtotime('monday this week');
-        $last7Days = strtotime('-7 days');
-        $lastWeek = strtotime('monday last week');
-        $last14Days = strtotime('-14 days');
-        $thisMonth = strtotime('first day of this month');
-        $last30Days = strtotime('-30 days');
-        $lastMonth = strtotime('first day of last month');
-        $thisYear = strtotime('first day of January this year');
-        $lastYear = strtotime('first day of January last year');
+        $today = strtotime('today', $now);
+        $yesterday = strtotime('yesterday', $now);
+        $thisWeek = strtotime('monday this week', $now);
+        $last7Days = strtotime('-7 days', $now);
+        $lastWeek = strtotime('monday last week', $now);
+        $last14Days = strtotime('-14 days', $now);
+        $thisMonth = strtotime('first day of this month', $now);
+        $last30Days = strtotime('-30 days', $now);
+        $lastMonth = strtotime('first day of last month', $now);
+        $thisYear = strtotime('first day of January this year', $now);
+        $lastYear = strtotime('first day of January last year', $now);
 
         return array(
             'time' => array(
@@ -532,47 +558,47 @@ class SucuriScanAPI extends SucuriScanOption
                 ),
                 'today' => array(
                     'label' => __('Today', 'sucuri-scanner'),
-                    'date' => SucuriScan::datetime($today, $format),
+                    'date' => gmdate($format, $today),
                 ),
                 'yesterday' => array(
                     'label' => __('Yesterday', 'sucuri-scanner'),
-                    'date' => SucuriScan::datetime($yesterday, $format),
+                    'date' => gmdate($format, $yesterday),
                 ),
                 'this week' => array(
                     'label' => __('This Week', 'sucuri-scanner'),
-                    'date' => SucuriScan::datetime($thisWeek, $format),
+                    'date' => gmdate($format, $thisWeek),
                 ),
                 'last 7 days' => array(
                     'label' => __('Last 7 Days', 'sucuri-scanner'),
-                    'date' => SucuriScan::datetime($last7Days, $format),
+                    'date' => gmdate($format, $last7Days),
                 ),
                 'last week' => array(
                     'label' => __('Last Week', 'sucuri-scanner'),
-                    'date' => SucuriScan::datetime($lastWeek, $format),
+                    'date' => gmdate($format, $lastWeek),
                 ),
                 'last 14 days' => array(
                     'label' => __('Last 14 Days', 'sucuri-scanner'),
-                    'date' => SucuriScan::datetime($last14Days, $format),
+                    'date' => gmdate($format, $last14Days),
                 ),
                 'this month' => array(
                     'label' => __('This Month', 'sucuri-scanner'),
-                    'date' => SucuriScan::datetime($thisMonth, $format),
+                    'date' => gmdate($format, $thisMonth),
                 ),
                 'last 30 days' => array(
                     'label' => __('Last 30 Days', 'sucuri-scanner'),
-                    'date' => SucuriScan::datetime($last30Days, $format),
+                    'date' => gmdate($format, $last30Days),
                 ),
                 'last month' => array(
                     'label' => __('Last Month', 'sucuri-scanner'),
-                    'date' => SucuriScan::datetime($lastMonth, $format),
+                    'date' => gmdate($format, $lastMonth),
                 ),
                 'this year' => array(
                     'label' => __('This Year', 'sucuri-scanner'),
-                    'date' => SucuriScan::datetime($thisYear, $format),
+                    'date' => gmdate($format, $thisYear),
                 ),
                 'last year' => array(
                     'label' => __('Last Year', 'sucuri-scanner'),
-                    'date' => SucuriScan::datetime($lastYear, $format),
+                    'date' => gmdate($format, $lastYear),
                 ),
                 'custom' => array(
                     'label' => __('Custom', 'sucuri-scanner'),
@@ -828,9 +854,9 @@ class SucuriScanAPI extends SucuriScanOption
     private static function filterByTime($log_date, $frontend_filters)
     {
         $filters = self::getFilters();
-        $today = strtotime('today');
+        $now = self::localNow();
         $time_option = $frontend_filters['time'];
-        $filter_date = SucuriScan::datetime($today, 'Y-m-d');
+        $filter_date = gmdate('Y-m-d', $now);
 
         if (isset($filters['time'][$time_option]['date'])) {
             $filter_date = $filters['time'][$time_option]['date'];
@@ -842,18 +868,15 @@ class SucuriScanAPI extends SucuriScanOption
                 return $log_date === $filter_date;
 
             case 'last week':
-                $endDate = strtotime('sunday last week');
-                $endDate = SucuriScan::datetime($endDate, 'Y-m-d');
+                $endDate = gmdate('Y-m-d', strtotime('sunday last week', $now));
                 return $log_date >= $filter_date && $log_date <= $endDate;
 
             case 'last month':
-                $endDate = strtotime('last day of last month');
-                $endDate = SucuriScan::datetime($endDate, 'Y-m-d');
+                $endDate = gmdate('Y-m-d', strtotime('last day of last month', $now));
                 return $log_date >= $filter_date && $log_date <= $endDate;
 
             case 'last year':
-                $endDate = strtotime('last day of December last year');
-                $endDate = SucuriScan::datetime($endDate, 'Y-m-d');
+                $endDate = gmdate('Y-m-d', strtotime('last day of December last year', $now));
                 return $log_date >= $filter_date && $log_date <= $endDate;
 
             case 'this week':
@@ -865,11 +888,8 @@ class SucuriScanAPI extends SucuriScanOption
                 return $log_date >= $filter_date;
 
             case 'custom':
-                $startDate = strtotime($frontend_filters['startDate']);
-                $startDate = SucuriScan::datetime($startDate, 'Y-m-d');
-                $endDate = strtotime($frontend_filters['endDate']);
-                $endDate = SucuriScan::datetime($endDate, 'Y-m-d');
-                return $log_date >= $startDate && $log_date <= $endDate;
+                /* already validated as Y-m-d dates */
+                return $log_date >= $frontend_filters['startDate'] && $log_date <= $frontend_filters['endDate'];
 
             default:
                 // Unrecognized time option; don't consider it a match.
@@ -918,43 +938,8 @@ class SucuriScanAPI extends SucuriScanOption
             $log_data['message'] = $right;
             $log_data['account'] = $dateAndEmail[2];
 
-            /**
-             * When the audit logs comes from the queue, it's necessary to convert
-             * the logs using the correct timezone before parsing to avoid issues.
-             * First, use timezone override feature if set on the plugin settings,
-             * convert it properly as the syntax must be compatible with php strtotime,
-             * otherwise use WordPress timezone or offset with a quick fix only for UTC
-             * as by default it would be set as "0" instead of "UTC".
-             */
-            $tz_override = SucuriScanOption::getOption(':timezone');
-            if (empty($tz_override)) {
-                $wpTimezone = get_option('timezone_string');
-                if (empty($wpTimezone)) {
-                    $wpTimezone = get_option('gmt_offset');
-                }
-
-                /* set wpTimezone to UTC if was previously unset */
-                if ($wpTimezone == "0") {
-                    $wpTimezone = "UTC";
-                }
-            } else {
-                $tz_override_replace_from = array(".", "UTC");
-                $tz_override_replace_to = array(":", "");
-                $wpTimezone = str_replace($tz_override_replace_from, $tz_override_replace_to, $tz_override);
-            }
-
-            /**
-             * When the audit logs comes from the audit logs server, it will
-             * be using EDT timezone, however due to the seasonal nature of the
-             * EDT timzeone, here we will be using America/New_York when and only
-             * when the audit logs comes from the audit logs server, cause when
-             * it comes from the queue, wpTimezone var will be used.
-             */
-            if (array_key_exists('from_queue', $res)) {
-                $datetime = sprintf('%s %s %s', $dateAndEmail[0], $dateAndEmail[1], $wpTimezone);
-            } else {
-                $datetime = sprintf('%s %s America/New_York', $dateAndEmail[0], $dateAndEmail[1]);
-            }
+            /* the API sends Eastern Time; queued entries are written in it too */
+            $datetime = sprintf('%s %s America/New_York', $dateAndEmail[0], $dateAndEmail[1]);
 
             $log_data['timestamp'] = strtotime($datetime);
             $log_data['datetime'] = SucuriScan::datetime($log_data['timestamp'], 'Y-m-d H:i:s');

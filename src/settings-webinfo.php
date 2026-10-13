@@ -45,7 +45,7 @@ function sucuriscan_settings_webinfo_details()
     $info_vars['Datetime_and_Timezone'] = sprintf(
         '%s (%s)',
         SucuriScan::datetime(),
-        SucuriScanOption::getOption(':timezone')
+        SucuriScanOption::getOption(':timezone') === 'wordpress' ? wp_timezone_string() : SucuriScanOption::getOption(':timezone')
     );
 
     if (defined('WP_DEBUG') && WP_DEBUG) {

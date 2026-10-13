@@ -58,6 +58,25 @@ test.describe("Settings · General", () => {
     );
   });
 
+  test("switches the timezone back to the WordPress timezone", async ({
+    page,
+  }) => {
+    updateOption("sucuriscan_timezone", "UTC-07.00");
+    await page.goto(GENERAL_URL);
+    await page
+      .getByTestId("sucuriscan_timezone_select")
+      .selectOption("wordpress");
+    await page.getByTestId("sucuriscan_timezone_submit").click();
+    await expectNotice(
+      page,
+      "The timezone for the date and time in the audit logs has been changed",
+    );
+    await page.goto(GENERAL_URL);
+    await expect(page.getByTestId("sucuriscan_timezone_select")).toHaveValue(
+      "wordpress",
+    );
+  });
+
   test("updates IP address discovery (DNS lookups + header)", async ({
     page,
   }) => {

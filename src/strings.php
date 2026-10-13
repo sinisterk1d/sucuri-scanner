@@ -506,7 +506,7 @@ __('Submit', 'sucuri-scanner');
 // settings-general-timezone.html.tpl
 __('Timezone Override', 'sucuri-scanner');
 __(
-    'This option defines the timezone that will be used through out the entire plugin to print the dates and times whenever is necessary. This option also affects the date and time of the logs visible in the audit logs panel which is data that comes from a remote server configured to use Eastern Daylight Time (EDT). WordPress offers an option in the general settings page to allow you to configure the timezone for the entire website, however, if you are experiencing problems with the time in the audit logs, this option will help you fix them.',
+    'By default the plugin shows every date and time, including the audit logs and the last logins, in the timezone set under Settings &gt; General in WordPress. Pick a fixed UTC offset here only if you want the plugin to use a different timezone than the rest of the website. Fixed offsets do not follow daylight saving time.',
     'sucuri-scanner'
 );
 __('Timezone:', 'sucuri-scanner');

@@ -601,13 +601,12 @@ class SucuriScanAuditLogs
                 'output' => array(
                     sprintf(
                         '%s %s : %s',
-                        SucuriScan::datetime($timestamp, 'Y-m-d H:i:s'),
+                        SucuriScanAPI::auditLogDatetime($timestamp),
                         SucuriScan::getSiteEmail(),
                         $message
                     ),
                 ),
                 'total_entries' => 1,
-                'from_queue' => '1',
             )
         );
 

@@ -730,9 +730,10 @@ class SucuriScan
             $hour = (float) substr($tz, 4);
             $sign = ($tz[3] === '-') ? -1 : +1;
             $diff = ($hour * $sign);
-        } else {
+        } elseif ($tz !== 'wordpress') {
             /* reset; value seems to be corrupt */
             SucuriScanOption::deleteOption(':timezone');
+            $tz = 'wordpress';
         }
 
         if ($format === null) {
@@ -745,6 +746,11 @@ class SucuriScan
                 is_string($date_format) && trim(gmdate($date_format)) !== '' ? $date_format : 'F j, Y',
                 is_string($time_format) && trim(gmdate($time_format)) !== '' ? $time_format : 'g:i a'
             );
+        }
+
+        if ($tz === 'wordpress') {
+            /* DateTime over wp_date(): callers parse the result back, so no localized names */
+            return date_create('@' . intval($timestamp))->setTimezone(wp_timezone())->format($format);
         }
 
         return gmdate($format, (intval($timestamp) + ($diff * 3600)));

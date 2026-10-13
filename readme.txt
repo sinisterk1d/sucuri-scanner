@@ -263,6 +263,12 @@ This version removes the dependency on the discontinued https://wordpress.sucuri
 This version adds an option to refresh the malware scan results on demand, as well as several small bug fixes and improvements.
 
 == Changelog ==
+= 2.8.2 =
+* Fix successful and failed logins on the Last Logins page being shown hours apart on sites that are not set to UTC. Dates and times across the plugin, including notification emails and the self-hosted log file, now follow the timezone set under Settings > General in WordPress, daylight saving time included, and existing login records are shown correctly without any action on your part.
+* Add a "Use the WordPress timezone" choice to the Timezone Override setting, selected by default. A fixed UTC offset you picked earlier is kept. Sites still on the old UTC+00.00 default are moved to the WordPress timezone once; pick UTC+00.00 again if you want to keep it.
+* Fix the audit log date filters ("Today", "Yesterday", "This Week", custom ranges and so on) matching the wrong day for part of the day on sites that are not set to UTC.
+* Fix audit events that are still waiting to be sent being shown at the wrong time, and at the start of 1970 on sites set to a timezone override such as UTC+12.75.
+
 = 2.8 =
 * Add one-time backup codes for Two-Factor Authentication. Ten codes are created when 2FA is turned on, any one of them will get you in if you lose your authenticator app, and each code stops working once it has been used. You can generate a fresh set at any time from your WordPress profile.
 * Add a search box and severity, plugin, and theme filters to the Audit Logs page, so you can find a specific event without paging through the whole history. Filtering and paging now happen instantly.

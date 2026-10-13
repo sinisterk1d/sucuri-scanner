@@ -550,7 +550,10 @@ function sucuriscan_settings_general_timezone($nonce)
 {
     $params = array();
     $current = time();
-    $options = array();
+    $options = array(
+        /* translators: %s: timezone from Settings > General, e.g. America/New_York */
+        'wordpress' => sprintf(__('Use the WordPress timezone (%s)', 'sucuri-scanner'), wp_timezone_string()),
+    );
     $offsets = array(
         -12.0, -11.5, -11.0, -10.5, -10.0, -9.50, -9.00, -8.50, -8.00, -7.50,
         -7.00, -6.50, -6.00, -5.50, -5.00, -4.50, -4.00, -3.50, -3.00, -2.50,
@@ -569,12 +572,12 @@ function sucuriscan_settings_general_timezone($nonce)
     }
 
     if ($nonce) {
-        $pattern = 'UTC[\-\+][0-9]{2}\.[0-9]{2}';
+        $pattern = '(wordpress|UTC[\-\+][0-9]{2}\.[0-9]{2})';
         $timezone = SucuriScanRequest::post(':timezone', $pattern);
 
         if ($timezone) {
             /* translators: %s: timezone */
-            $message = sprintf(__('Timezone override will use %s', 'sucuri-scanner'), $timezone);
+            $message = sprintf(__('Timezone override will use %s', 'sucuri-scanner'), $timezone === 'wordpress' ? wp_timezone_string() : $timezone);
 
             SucuriScanOption::updateOption(':timezone', $timezone);
             SucuriScanEvent::reportInfoEvent($message);

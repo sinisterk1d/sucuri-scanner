@@ -56,6 +56,34 @@ final class DatetimeFormatTest extends TestCase
         $this->assertSame($expected, SucuriScan::datetime(self::TIMESTAMP));
     }
 
+    /**
+     * @dataProvider wordpressTimezone
+     */
+    public function testNoOverrideUsesTheWordPressTimezone($timestamp, $expected)
+    {
+        Functions\when('wp_cache_get')->justReturn(array('sucuriscan_timezone' => 'wordpress'));
+        Functions\when('wp_timezone')->justReturn(new DateTimeZone('America/New_York'));
+        $this->wpOptions = array('date_format' => 'Y-m-d', 'time_format' => 'H:i');
+
+        $this->assertSame($expected, SucuriScan::datetime($timestamp));
+    }
+
+    public function wordpressTimezone()
+    {
+        return array(
+            'standard time' => array(self::TIMESTAMP, '2023-11-14 17:13'),
+            'daylight saving time' => array(gmmktime(12, 14, 0, 9, 30, 2026), '2026-09-30 08:14'),
+        );
+    }
+
+    public function testSavedOverrideIgnoresTheWordPressTimezone()
+    {
+        Functions\when('wp_cache_get')->justReturn(array('sucuriscan_timezone' => 'UTC+05.50'));
+        Functions\expect('wp_timezone')->never();
+
+        $this->assertSame('2023-11-15 03:43', SucuriScan::datetime(self::TIMESTAMP, 'Y-m-d H:i'));
+    }
+
     public function unusableFormats()
     {
         return array(

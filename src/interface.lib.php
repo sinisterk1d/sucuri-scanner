@@ -249,6 +249,19 @@ class SucuriScanInterface
         SucuriScanOption::updateOption(':plugin_version', SUCURISCAN_VERSION);
 
         /**
+         * Older versions persisted UTC+00.00 as the timezone default the first
+         * time it was read, so it cannot be told apart from a deliberate choice.
+         * Move those sites to the WordPress timezone once; picking UTC+00.00
+         * again afterwards sticks.
+         */
+        if (
+            version_compare($version, '2.8.2', '<')
+            && SucuriScanOption::getOption(':timezone') === 'UTC+00.00'
+        ) {
+            SucuriScanOption::updateOption(':timezone', 'wordpress');
+        }
+
+        /**
          * Invite website owner to subscribe to our security newsletter.
          *
          * For every fresh installation of the plugin we will send a one-time
