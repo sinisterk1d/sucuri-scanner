@@ -174,7 +174,7 @@ if (!function_exists('sucuriscan_set_online_user')) {
         $current_user = ($user instanceof WP_User) ? $user : wp_get_current_user();
         $current_user_id = $current_user->ID;
         $remote_addr = SucuriScan::getRemoteAddr();
-        $current_time = current_time('timestamp');
+        $current_time = time();
         $logged_in_users = sucuriscan_get_online_users();
 
         /* build the dataset for the transient variable */

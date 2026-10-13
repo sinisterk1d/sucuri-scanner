@@ -349,7 +349,9 @@ function sucuriscan_get_logins($limit = 10, $offset = 0, $user_id = 0)
             continue;
         }
 
-        $last_login['user_lastlogin_timestamp'] = strtotime($last_login['user_lastlogin']);
+        // Stored as site-local time (current_time('mysql')); convert it to a real
+        // UTC timestamp so it lines up with the failed logins, which use time().
+        $last_login['user_lastlogin_timestamp'] = (int) get_gmt_from_date($last_login['user_lastlogin'], 'U');
         $last_login['user_registered_timestamp'] = 0;
 
         // Only administrators can see all login stats.
